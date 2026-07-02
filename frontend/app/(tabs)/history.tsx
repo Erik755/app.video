@@ -19,6 +19,7 @@ import { colors, spacing, radius, fonts, fontSize } from "@/src/theme";
 import { useSpeech } from "@/src/hooks/useSpeech";
 import { getHistory, deleteHistoryItem, synthesizeAudio, ScriptItem } from "@/src/api";
 import { Toast } from "@/src/components/Toast";
+import { HelpModal } from "@/src/components/HelpModal";
 import { useMp3Voice } from "@/src/hooks/useMp3Voice";
 import { downloadAudioBase64 } from "@/src/utils/audioDownload";
 
@@ -41,6 +42,7 @@ export default function HistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(
     null,
   );
@@ -209,8 +211,19 @@ export default function HistoryScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <Text style={styles.brand}>Historial</Text>
-        <Text style={styles.subtitle}>Tus guiones generados</Text>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.brand}>Historial</Text>
+            <Text style={styles.subtitle}>Tus guiones generados</Text>
+          </View>
+          <Pressable
+            testID="help-button"
+            onPress={() => setHelpOpen(true)}
+            style={styles.helpBtn}
+          >
+            <Ionicons name="help-circle-outline" size={20} color={colors.brandPrimary} />
+          </Pressable>
+        </View>
       </View>
 
       {loading ? (
@@ -252,6 +265,20 @@ export default function HistoryScreen() {
         type={toast?.type || "info"}
         onHide={() => setToast(null)}
       />
+
+      <HelpModal
+        visible={helpOpen}
+        title="Historial de guiones"
+        intro="Aquí se guardan automáticamente todos los guiones que generas."
+        steps={[
+          "Toca 'Reproducir' para escuchar un guion en voz alta, o 'Detener' para pararlo.",
+          "Usa el icono de descarga para generar y guardar el audio MP3 del guion.",
+          "El icono de compartir envía el guion a WhatsApp, redes o notas.",
+          "El icono de papelera elimina el guion del historial.",
+          "Desliza hacia abajo para actualizar la lista.",
+        ]}
+        onClose={() => setHelpOpen(false)}
+      />
     </View>
   );
 }
@@ -263,6 +290,21 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  helpBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   brand: {
     fontFamily: fonts.display,

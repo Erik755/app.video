@@ -33,6 +33,7 @@ import {
 import { Toast } from "@/src/components/Toast";
 import { AudioPlayerBar } from "@/src/components/AudioPlayerBar";
 import { VoicePicker } from "@/src/components/VoicePicker";
+import { HelpModal } from "@/src/components/HelpModal";
 import { useMp3Voice, OPENAI_VOICES } from "@/src/hooks/useMp3Voice";
 import { downloadAudioBase64 } from "@/src/utils/audioDownload";
 
@@ -72,6 +73,7 @@ export default function GeneratorScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScriptItem | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   const [toast, setToast] = useState<{
@@ -262,6 +264,13 @@ export default function GeneratorScreen() {
               Analiza un video con IA y léelo en voz alta
             </Text>
           </View>
+          <Pressable
+            testID="help-button"
+            onPress={() => setHelpOpen(true)}
+            style={styles.iconHeaderBtn}
+          >
+            <Ionicons name="help-circle-outline" size={20} color={colors.brandPrimary} />
+          </Pressable>
           <Pressable
             testID="clear-button"
             onPress={resetAll}
@@ -591,6 +600,21 @@ export default function GeneratorScreen() {
           showToast("Voz del audio MP3 actualizada.", "success");
         }}
         onClose={() => setVoiceOpen(false)}
+      />
+
+      <HelpModal
+        visible={helpOpen}
+        title="Generar guiones"
+        intro="Convierte un video o un texto en un guion viral y escúchalo o descárgalo como MP3."
+        steps={[
+          "Elige el modo: Enlace (pega el link de un video), Galería (sube un video de tu celular) o Texto (escribe cualquier texto).",
+          "Opcional: añade una descripción del video y un estilo, o toca un preset de tono (Viral, Educativo, Humor, Motivacional).",
+          "Pulsa 'Procesar y Leer'. La IA analiza el video y crea un guion original que dura ≈ lo mismo que el video, y lo lee en voz alta.",
+          "Con el botón 'Voz' eliges la voz de lectura (dispositivo) y la voz del audio MP3 (OpenAI).",
+          "En el resultado puedes copiar, compartir o 'Descargar audio (MP3)'.",
+          "El icono ↻ limpia todo para empezar de nuevo.",
+        ]}
+        onClose={() => setHelpOpen(false)}
       />
     </View>
   );
