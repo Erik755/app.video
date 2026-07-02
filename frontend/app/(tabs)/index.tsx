@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -36,6 +36,7 @@ import { VoicePicker } from "@/src/components/VoicePicker";
 import { HelpModal } from "@/src/components/HelpModal";
 import { useMp3Voice, OPENAI_VOICES } from "@/src/hooks/useMp3Voice";
 import { downloadAudioBase64 } from "@/src/utils/audioDownload";
+import { storage } from "@/src/utils/storage";
 
 type Mode = "link" | "upload" | "text";
 type PickedVideo = { uri: string; name: string; type: string };
@@ -74,7 +75,21 @@ export default function GeneratorScreen() {
   const [result, setResult] = useState<ScriptItem | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [onboardOpen, setOnboardOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  // Mini-tutorial de bienvenida: solo la primera vez que se abre la app.
+  useEffect(() => {
+    (async () => {
+      const seen = await storage.getItem<boolean>("seen_tutorial", false);
+      if (!seen) setOnboardOpen(true);
+    })();
+  }, []);
+
+  const closeOnboarding = useCallback(async () => {
+    setOnboardOpen(false);
+    await storage.setItem("seen_tutorial", true);
+  }, []);
 
   const [toast, setToast] = useState<{
     msg: string;
@@ -615,6 +630,22 @@ export default function GeneratorScreen() {
           "El icono ↻ limpia todo para empezar de nuevo.",
         ]}
         onClose={() => setHelpOpen(false)}
+      />
+
+      <HelpModal
+        visible={onboardOpen}
+        heading="¡Bienvenido a Guion viral!"
+        title="Tu creador de guiones con IA"
+        intro="Convierte cualquier video o texto en un guion viral en español y escúchalo o descárgalo como MP3. Así funciona:"
+        steps={[
+          "Pega el enlace de un video, sube uno de tu galería o escribe un texto.",
+          "La IA analiza el contenido y crea un guion original que dura ≈ lo mismo que el video.",
+          "Escúchalo en voz alta y elige la voz que más te guste.",
+          "Descarga el audio en MP3 o compártelo con un toque.",
+          "Toca el icono (?) en cualquier pantalla para volver a ver estas indicaciones.",
+        ]}
+        ctaLabel="Empezar"
+        onClose={closeOnboarding}
       />
     </View>
   );

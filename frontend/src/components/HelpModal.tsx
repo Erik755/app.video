@@ -17,12 +17,16 @@ export function HelpModal({
   title,
   intro,
   steps,
+  heading = "¿Cómo funciona esto?",
+  ctaLabel,
   onClose,
 }: {
   visible: boolean;
   title: string;
   intro?: string;
   steps: string[];
+  heading?: string;
+  ctaLabel?: string;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -40,7 +44,7 @@ export function HelpModal({
         <View style={styles.headerRow}>
           <View style={styles.titleRow}>
             <Ionicons name="help-circle" size={22} color={colors.brandPrimary} />
-            <Text style={styles.title}>¿Cómo funciona esto?</Text>
+            <Text style={styles.title}>{heading}</Text>
           </View>
           <Pressable testID="help-close" onPress={onClose} hitSlop={8}>
             <Ionicons name="close" size={22} color={colors.onSurfaceSecondary} />
@@ -64,6 +68,12 @@ export function HelpModal({
             ))}
           </View>
         </ScrollView>
+
+        {ctaLabel ? (
+          <Pressable testID="help-cta" onPress={onClose} style={styles.cta}>
+            <Text style={styles.ctaText}>{ctaLabel}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Modal>
   );
@@ -142,5 +152,19 @@ const styles = StyleSheet.create({
     fontSize: fontSize.base,
     color: colors.onSurfaceSecondary,
     lineHeight: 20,
+  },
+  cta: {
+    height: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandPrimary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: spacing.md,
+  },
+  ctaText: {
+    fontFamily: fonts.display,
+    fontSize: fontSize.xl,
+    color: colors.onBrandPrimary,
+    letterSpacing: 0.5,
   },
 });
