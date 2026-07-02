@@ -31,6 +31,7 @@ import {
 } from "@/src/api";
 import { Toast } from "@/src/components/Toast";
 import { AudioPlayerBar } from "@/src/components/AudioPlayerBar";
+import { VoicePicker } from "@/src/components/VoicePicker";
 
 type Mode = "link" | "upload" | "text";
 type PickedVideo = { uri: string; name: string; type: string };
@@ -52,7 +53,8 @@ const BOTTOM_BAR_HEIGHT = 96;
 
 export default function GeneratorScreen() {
   const insets = useSafeAreaInsets();
-  const { isSpeaking, isPaused, speak, pause, resume, stop } = useSpeech();
+  const { isSpeaking, isPaused, voices, voiceId, speak, pause, resume, stop, selectVoice } =
+    useSpeech();
 
   const [mode, setMode] = useState<Mode>("link");
   const [url, setUrl] = useState("");
@@ -65,6 +67,7 @@ export default function GeneratorScreen() {
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScriptItem | null>(null);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   const [toast, setToast] = useState<{
     msg: string;
@@ -221,13 +224,23 @@ export default function GeneratorScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
-        <View>
-          <Text style={styles.brand}>
-            GUION<Text style={{ color: colors.brandPrimary }}>VIRAL</Text>
-          </Text>
-          <Text style={styles.subtitle}>
-            Analiza un video con IA y léelo en voz alta
-          </Text>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.brand}>
+              GUION<Text style={{ color: colors.brandPrimary }}>VIRAL</Text>
+            </Text>
+            <Text style={styles.subtitle}>
+              Analiza un video con IA y léelo en voz alta
+            </Text>
+          </View>
+          <Pressable
+            testID="voice-button"
+            onPress={() => setVoiceOpen(true)}
+            style={styles.voiceBtn}
+          >
+            <Ionicons name="options-outline" size={18} color={colors.brandPrimary} />
+            <Text style={styles.voiceBtnText}>Voz</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -504,6 +517,21 @@ export default function GeneratorScreen() {
         type={toast?.type || "info"}
         onHide={() => setToast(null)}
       />
+
+      <VoicePicker
+        visible={voiceOpen}
+        voices={voices}
+        selectedId={voiceId}
+        onSelect={(id) => {
+          selectVoice(id);
+          setVoiceOpen(false);
+          showToast("Voz actualizada.", "success");
+        }}
+        onPreview={(id) =>
+          speak("Hola, así se escuchará tu guion viral.", id)
+        }
+        onClose={() => setVoiceOpen(false)}
+      />
     </View>
   );
 }
@@ -515,6 +543,27 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.divider,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  voiceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  voiceBtnText: {
+    fontFamily: fonts.displaySemi,
+    fontSize: fontSize.base,
+    color: colors.brandPrimary,
   },
   brand: {
     fontFamily: fonts.display,
