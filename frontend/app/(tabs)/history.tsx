@@ -17,11 +17,11 @@ import dayjs from "dayjs";
 
 import { colors, spacing, radius, fonts, fontSize } from "@/src/theme";
 import { useSpeech } from "@/src/hooks/useSpeech";
-import { getHistory, deleteHistoryItem, synthesizeAudio, ScriptItem } from "@/src/api";
+import { getHistory, deleteHistoryItem, ttsToStorage, mediaUrl, ScriptItem } from "@/src/api";
 import { Toast } from "@/src/components/Toast";
 import { HelpModal } from "@/src/components/HelpModal";
 import { useMp3Voice } from "@/src/hooks/useMp3Voice";
-import { downloadAudioBase64 } from "@/src/utils/audioDownload";
+import { downloadAudioUrl } from "@/src/utils/audioDownload";
 
 const EMPTY_IMG =
   "https://images.pexels.com/photos/7301210/pexels-photo-7301210.jpeg";
@@ -97,12 +97,9 @@ export default function HistoryScreen() {
     setDownloadingId(item.id);
     setToast({ msg: "Generando audio…", type: "info" });
     try {
-      const { audio_base64 } = await synthesizeAudio(item.script_generado, mp3Voice);
-      const safe = (item.source_title || "guion")
-        .replace(/[^a-z0-9]+/gi, "_")
-        .slice(0, 40);
-      await downloadAudioBase64(audio_base64, `guionviral_${safe}.mp3`);
-      setToast({ msg: "Audio listo para guardar.", type: "success" });
+      const media = await ttsToStorage(item.script_generado, mp3Voice);
+      await downloadAudioUrl(mediaUrl(media.url), media.filename);
+      setToast({ msg: "Audio guardado en el store y listo.", type: "success" });
     } catch (e) {
       setToast({
         msg: e instanceof Error ? e.message : "No se pudo generar el audio.",

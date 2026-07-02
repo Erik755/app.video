@@ -1,0 +1,43 @@
+{
+  "summary": "GuionViral iteration 4 — validated the new File & media storage integration (MongoDB GridFS). Backend: added /app/backend/tests/test_media_storage.py with 7 tests covering /api/files/tts (nova), /api/files/upload (image/jpeg), /api/files (list, no _id, DESC order), GET /api/files/{id} (headers Content-Type audio/mpeg + Content-Disposition attachment + Content-Length == size + real MP3 signature ID3/0xFF), GET nonexistent -> 404, DELETE -> 200 {deleted:true, id} then GET 404, DELETE nonexistent -> 404, and empty-payload rejections (tts 400, upload 400). Result: 7/7 PASSED. Frontend (mobile 390x844): dismissed onboarding, switched to mode-text, typed 130-char text, tapped process-button ('Leer en voz alta'), result-card + download-audio-button appeared. Tapped download-audio-button: toast transitioned from 'Generando audio…' to 'Audio guardado en el store y listo.' (success, no error toast). History: found real card testIDs (history-card-<uuid>, download-<uuid>, share-<uuid>, play-<uuid>, delete-<uuid>); tapping download-<uuid> also transitioned 'Generando audio…' -> 'Audio guardado en el store y listo.' with no error toast. Note: Playwright's page.on('download') did not fire for the <a target='_blank' + download> path in the preview because target='_blank' is treated as a popup — but the anchor is created and clicked (verified by success toast + backend log 200 GET /api/files/{id}), and real browsers honor Content-Disposition: attachment. Deprecated packages/SafeAreaView issues: none detected. Same pre-existing web-only warnings persist (useNativeDriver, props.pointerEvents) — non-blocking.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "audioDownload/index.web.ts", "issue": "Anchor uses target='_blank' + download. Playwright treats target='_blank' as a popup so the 'download' event doesn't fire in the preview harness (real browsers still download because of Content-Disposition: attachment). Consider removing target='_blank' or use window.location.assign(url) for the web path to simplify testing. Reference: /app/frontend/src/utils/audioDownload/index.web.ts:9"}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_media_storage.py",
+    "/app/test_reports/pytest/pytest_media.xml"
+  ],
+  "action_items": [
+    "(Optional) In /app/frontend/src/utils/audioDownload/index.web.ts, drop link.target='_blank' so Playwright fires the download event too; real browsers already honor Content-Disposition attachment.",
+    "(Carried over) Extend ScriptItem.source_type union in /app/frontend/src/api.ts to include 'upload'/'text' (already used by backend)."
+  ],
+  "critical_code_review_comments": [
+    "server.py _store_media(): uses AsyncIOMotorGridFSBucket + a media_files metadata collection, and returns a URL '/api/files/{id}'. No _id leak (both find({}, {_id:0}) and MediaItem model). Verified in list_media test.",
+    "server.py download_media(): streams via GridFS with correct Content-Type and Content-Disposition attachment + Content-Length; unknown id -> 404. All verified.",
+    "server.py tts_to_storage(): validates voice against OpenAITextToSpeech.VOICES, rejects empty text (400), catches synth errors -> 502. Verified with 200/400.",
+    "server.py upload_media(): rejects empty (400). Content-type guessed for kind. Verified with image/jpeg -> kind='image'.",
+    "index.tsx downloadAudio(): shows 'Generando audio…' -> 'Audio guardado en el store y listo.' matching spec. Verified.",
+    "history.tsx downloadMp3(): shows 'Generando audio…' -> 'Audio guardado en el store y listo.' per card. testIDs download-<id>/share-<id>/play-<id>/delete-<id> confirmed on real cards."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_media_storage.py (new: 7 tests for /api/files/* endpoints)"
+  ],
+  "success_rate": {
+    "backend": "100% (7/7 new media-storage tests). Not re-ran full regression to preserve Gemini budget per agent note.",
+    "frontend": "100% of exercised flows (text-mode download success, history-card download success, both without error toasts)."
+  },
+  "seed_data_creation": "Created media items via tests are auto-cleaned by session teardown (deletes filenames containing 'TEST_' or starting with 'guionviral_'). One 'Texto directo' script from the UI test was created as before; cleanup is left to next TEST_ sweep.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "New tests at /app/backend/tests/test_media_storage.py. All /api/files/* endpoints work. Frontend downloads confirmed via toast state transitions (not via Playwright download event because of target='_blank' popup treatment). testIDs of interest: mode-text, text-input, process-button, result-card, download-audio-button; History: history-card-<uuid>, download-<uuid>, share-<uuid>, play-<uuid>, delete-<uuid>.",
+  "rca_of_issue": "N/A — no failures. Only observation: Playwright 'download' event not captured because index.web.ts sets link.target='_blank' on the anchor; Playwright treats it as a popup and lets browser navigate. Backend correctly serves the file with Content-Disposition: attachment, so real browsers download. Fix (optional): remove target='_blank' in /app/frontend/src/utils/audioDownload/index.web.ts."
+}

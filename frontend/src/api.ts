@@ -83,6 +83,34 @@ export async function saveText(
   return handle<ScriptItem>(res);
 }
 
+export type MediaItem = {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  kind: string;
+  url: string; // ruta relativa: /api/files/{id}
+  created_at: string;
+};
+
+// Genera el MP3 en el servidor, lo guarda en el store y devuelve su URL de descarga.
+export async function ttsToStorage(
+  text: string,
+  voice?: string,
+): Promise<MediaItem> {
+  const res = await fetch(`${BASE}/api/files/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, voice }),
+  });
+  return handle<MediaItem>(res);
+}
+
+// Convierte la ruta relativa del store en una URL absoluta descargable.
+export function mediaUrl(path: string): string {
+  return `${BASE}${path}`;
+}
+
 export async function synthesizeAudio(
   text: string,
   voice?: string,

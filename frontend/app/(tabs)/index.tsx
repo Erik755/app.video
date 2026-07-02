@@ -27,7 +27,8 @@ import {
   generateFromLink,
   generateFromUpload,
   saveText,
-  synthesizeAudio,
+  ttsToStorage,
+  mediaUrl,
   ScriptItem,
 } from "@/src/api";
 import { Toast } from "@/src/components/Toast";
@@ -35,7 +36,7 @@ import { AudioPlayerBar } from "@/src/components/AudioPlayerBar";
 import { VoicePicker } from "@/src/components/VoicePicker";
 import { HelpModal } from "@/src/components/HelpModal";
 import { useMp3Voice, OPENAI_VOICES } from "@/src/hooks/useMp3Voice";
-import { downloadAudioBase64 } from "@/src/utils/audioDownload";
+import { downloadAudioUrl } from "@/src/utils/audioDownload";
 import { storage } from "@/src/utils/storage";
 
 type Mode = "link" | "upload" | "text";
@@ -238,15 +239,9 @@ export default function GeneratorScreen() {
     setDownloading(true);
     showToast("Generando audio…", "info");
     try {
-      const { audio_base64 } = await synthesizeAudio(
-        result.script_generado,
-        mp3Voice,
-      );
-      const safe = (result.source_title || "guion")
-        .replace(/[^a-z0-9]+/gi, "_")
-        .slice(0, 40);
-      await downloadAudioBase64(audio_base64, `guionviral_${safe}.mp3`);
-      showToast("Audio listo para guardar.", "success");
+      const media = await ttsToStorage(result.script_generado, mp3Voice);
+      await downloadAudioUrl(mediaUrl(media.url), media.filename);
+      showToast("Audio guardado en el store y listo.", "success");
     } catch (e) {
       showToast(
         e instanceof Error ? e.message : "No se pudo generar el audio.",
