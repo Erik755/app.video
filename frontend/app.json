@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.viralcontentmaker.ykf50k"
+      "bundleIdentifier": "com.emergent.viralcontentmaker.ykf50k",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Elige un video de tu galería para analizarlo con IA"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +21,8 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.emergent.viralcontentmaker.ykf50k"
+      "package": "com.emergent.viralcontentmaker.ykf50k",
+      "permissions": ["READ_MEDIA_VIDEO"]
     },
     "web": {
       "bundler": "metro",
@@ -27,6 +31,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Elige un video de tu galería para analizarlo con IA"
+        }
+      ],
       [
         "expo-splash-screen",
         {
