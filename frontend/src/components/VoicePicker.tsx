@@ -35,6 +35,9 @@ export function VoicePicker({
   selectedId,
   onSelect,
   onPreview,
+  openaiVoices,
+  selectedOpenaiId,
+  onSelectOpenai,
   onClose,
 }: {
   visible: boolean;
@@ -42,6 +45,9 @@ export function VoicePicker({
   selectedId: string;
   onSelect: (id: string) => void;
   onPreview: (id: string) => void;
+  openaiVoices: { id: string; label: string }[];
+  selectedOpenaiId: string;
+  onSelectOpenai: (id: string) => void;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -63,18 +69,19 @@ export function VoicePicker({
           </Pressable>
         </View>
 
-        {voices.length === 0 ? (
-          <Text style={styles.empty}>
-            No se encontraron voces en español en este dispositivo. Se usará la
-            voz predeterminada del sistema.
-          </Text>
-        ) : (
-          <ScrollView
-            style={styles.list}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.sm }}
-          >
-            {voices.map((v) => {
+        <ScrollView
+          style={styles.list}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ gap: spacing.sm, paddingBottom: spacing.md }}
+        >
+          <Text style={styles.section}>Voz de lectura en la app (dispositivo)</Text>
+          {voices.length === 0 ? (
+            <Text style={styles.empty}>
+              No se encontraron voces en español en este dispositivo. Se usará
+              la voz predeterminada del sistema.
+            </Text>
+          ) : (
+            voices.map((v) => {
               const active = v.identifier === selectedId;
               return (
                 <View
@@ -106,9 +113,33 @@ export function VoicePicker({
                   </Pressable>
                 </View>
               );
-            })}
-          </ScrollView>
-        )}
+            })
+          )}
+
+          <Text style={[styles.section, { marginTop: spacing.lg }]}>
+            Voz del audio descargado (MP3)
+          </Text>
+          {openaiVoices.map((v) => {
+            const active = v.id === selectedOpenaiId;
+            return (
+              <Pressable
+                key={v.id}
+                testID={`mp3-voice-${v.id}`}
+                style={[styles.row, styles.rowMain, active && styles.rowActive]}
+                onPress={() => onSelectOpenai(v.id)}
+              >
+                <Ionicons
+                  name={active ? "radio-button-on" : "radio-button-off"}
+                  size={20}
+                  color={active ? colors.brandPrimary : colors.onSurfaceTertiary}
+                />
+                <Text style={styles.rowLabel} numberOfLines={1}>
+                  {v.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -160,6 +191,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
   list: { marginBottom: spacing.sm },
+  section: {
+    fontFamily: fonts.displaySemi,
+    fontSize: fontSize.sm,
+    color: colors.onSurfaceTertiary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",

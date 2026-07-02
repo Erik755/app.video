@@ -33,6 +33,7 @@ import {
 import { Toast } from "@/src/components/Toast";
 import { AudioPlayerBar } from "@/src/components/AudioPlayerBar";
 import { VoicePicker } from "@/src/components/VoicePicker";
+import { useMp3Voice, OPENAI_VOICES } from "@/src/hooks/useMp3Voice";
 import { downloadAudioBase64 } from "@/src/utils/audioDownload";
 
 type Mode = "link" | "upload" | "text";
@@ -57,6 +58,7 @@ export default function GeneratorScreen() {
   const insets = useSafeAreaInsets();
   const { isSpeaking, isPaused, voices, voiceId, speak, pause, resume, stop, selectVoice } =
     useSpeech();
+  const { voice: mp3Voice, setVoice: setMp3Voice } = useMp3Voice();
 
   const [mode, setMode] = useState<Mode>("link");
   const [url, setUrl] = useState("");
@@ -221,7 +223,7 @@ export default function GeneratorScreen() {
     try {
       const { audio_base64 } = await synthesizeAudio(
         result.script_generado,
-        voiceId || undefined,
+        mp3Voice,
       );
       const safe = (result.source_title || "guion")
         .replace(/[^a-z0-9]+/gi, "_")
@@ -577,12 +579,17 @@ export default function GeneratorScreen() {
         selectedId={voiceId}
         onSelect={(id) => {
           selectVoice(id);
-          setVoiceOpen(false);
-          showToast("Voz actualizada.", "success");
+          showToast("Voz de lectura actualizada.", "success");
         }}
         onPreview={(id) =>
           speak("Hola, así se escuchará tu guion viral.", id)
         }
+        openaiVoices={OPENAI_VOICES}
+        selectedOpenaiId={mp3Voice}
+        onSelectOpenai={(id) => {
+          setMp3Voice(id);
+          showToast("Voz del audio MP3 actualizada.", "success");
+        }}
         onClose={() => setVoiceOpen(false)}
       />
     </View>

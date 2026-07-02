@@ -19,6 +19,7 @@ import { colors, spacing, radius, fonts, fontSize } from "@/src/theme";
 import { useSpeech } from "@/src/hooks/useSpeech";
 import { getHistory, deleteHistoryItem, synthesizeAudio, ScriptItem } from "@/src/api";
 import { Toast } from "@/src/components/Toast";
+import { useMp3Voice } from "@/src/hooks/useMp3Voice";
 import { downloadAudioBase64 } from "@/src/utils/audioDownload";
 
 const EMPTY_IMG =
@@ -33,6 +34,7 @@ const SOURCE_ICON: Record<string, string> = {
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const { isSpeaking, isPaused, speak, stop } = useSpeech();
+  const { voice: mp3Voice } = useMp3Voice();
 
   const [items, setItems] = useState<ScriptItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +95,7 @@ export default function HistoryScreen() {
     setDownloadingId(item.id);
     setToast({ msg: "Generando audio…", type: "info" });
     try {
-      const { audio_base64 } = await synthesizeAudio(item.script_generado);
+      const { audio_base64 } = await synthesizeAudio(item.script_generado, mp3Voice);
       const safe = (item.source_title || "guion")
         .replace(/[^a-z0-9]+/gi, "_")
         .slice(0, 40);
