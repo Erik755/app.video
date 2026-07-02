@@ -83,8 +83,19 @@ export async function saveText(
   return handle<ScriptItem>(res);
 }
 
-export async function getHistory(): Promise<ScriptItem[]> {
-  const res = await fetch(`${BASE}/api/history`);
+export async function synthesizeAudio(
+  text: string,
+  voice?: string,
+): Promise<{ audio_base64: string; mime: string; voice: string }> {
+  const res = await fetch(`${BASE}/api/tts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, voice }),
+  });
+  return handle<{ audio_base64: string; mime: string; voice: string }>(res);
+}
+
+export async function getHistory(): Promise<ScriptItem[]> {  const res = await fetch(`${BASE}/api/history`);
   return handle<ScriptItem[]>(res);
 }
 

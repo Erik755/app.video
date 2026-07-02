@@ -11,6 +11,7 @@ Pipeline (POST /api/generate para enlaces, POST /api/generate-upload para video 
 """
 
 import os
+import re
 import uuid
 import shutil
 import base64
@@ -34,6 +35,7 @@ from emergentintegrations.llm.chat import (
     UserMessage,
     FileContentWithMimeType,
 )
+from emergentintegrations.llm.openai.text_to_speech import OpenAITextToSpeech
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
@@ -56,6 +58,9 @@ logger = logging.getLogger("guionviral")
 
 MAX_FRAMES = 6
 GEMINI_MODEL = "gemini-2.5-pro"
+TTS_MODEL = "tts-1"
+TTS_DEFAULT_VOICE = "nova"
+TTS_MAX_CHARS = 3900
 
 SYSTEM_PROMPT = (
     "Eres un experto creador de contenido viral en español. "
@@ -94,6 +99,11 @@ class ScriptItem(BaseModel):
 class SaveTextRequest(BaseModel):
     text: str
     title: Optional[str] = None
+
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: Optional[str] = None
 
 
 # --------------------------- Utilidades de video ---------------------------
@@ -405,6 +415,69 @@ async def save_text(req: SaveTextRequest):
     )
     await db.scripts.insert_one(item.dict())
     return item
+
+
+def _chunk_text(text: str, size: int = TTS_MAX_CHARS) -> List[str]:
+    """Divide un texto largo en fragmentos <= size respetando fin de frase."""
+    text = text.strip()
+    if len(text) <= size:
+        return [text]
+    chunks: List[str] = []
+    cur = ""
+    for sent in re.split(r"(?<=[.!?\n])\s+", text):
+        if len(cur) + len(sent) + 1 > size:
+            if cur:
+                chunks.append(cur)
+                cur = sent
+            else:
+                # frase única más larga que el límite: cortar duro
+                chunks.append(sent[:size])
+                cur = sent[size:]
+        else:
+            cur = (cur + " " + sent).strip()
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+async def _synthesize_tts(text: str, voice: str) -> bytes:
+    """Sintetiza voz con OpenAI TTS (vía Emergent Key). Une fragmentos largos."""
+    if not EMERGENT_LLM_KEY:
+        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY no configurada.")
+    tts = OpenAITextToSpeech(api_key=EMERGENT_LLM_KEY)
+    audio = b""
+    for chunk in _chunk_text(text):
+        part = await tts.generate_speech(
+            text=chunk,
+            model=TTS_MODEL,
+            voice=voice,
+            response_format="mp3",
+        )
+        audio += part
+    return audio
+
+
+@api_router.post("/tts")
+async def synthesize_audio(req: TTSRequest):
+    """Genera un archivo MP3 (base64) a partir del texto para descargar en la app."""
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="El texto no puede estar vacío.")
+    voice = req.voice or TTS_DEFAULT_VOICE
+    if voice not in OpenAITextToSpeech.VOICES:
+        voice = TTS_DEFAULT_VOICE
+    try:
+        audio = await _synthesize_tts(text, voice)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Fallo TTS: %s", e)
+        raise HTTPException(status_code=502, detail="No se pudo generar el audio.")
+    return {
+        "audio_base64": base64.b64encode(audio).decode("utf-8"),
+        "mime": "audio/mpeg",
+        "voice": voice,
+    }
 
 
 @api_router.get("/history", response_model=List[ScriptItem])

@@ -27,11 +27,13 @@ import {
   generateFromLink,
   generateFromUpload,
   saveText,
+  synthesizeAudio,
   ScriptItem,
 } from "@/src/api";
 import { Toast } from "@/src/components/Toast";
 import { AudioPlayerBar } from "@/src/components/AudioPlayerBar";
 import { VoicePicker } from "@/src/components/VoicePicker";
+import { downloadAudioBase64 } from "@/src/utils/audioDownload";
 
 type Mode = "link" | "upload" | "text";
 type PickedVideo = { uri: string; name: string; type: string };
@@ -68,6 +70,7 @@ export default function GeneratorScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScriptItem | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const [toast, setToast] = useState<{
     msg: string;
@@ -208,6 +211,30 @@ export default function GeneratorScreen() {
       });
     } catch {
       showToast("No se pudo compartir el guion.", "error");
+    }
+  };
+
+  const downloadAudio = async () => {
+    if (!result || downloading) return;
+    setDownloading(true);
+    showToast("Generando audio…", "info");
+    try {
+      const { audio_base64 } = await synthesizeAudio(
+        result.script_generado,
+        voiceId || undefined,
+      );
+      const safe = (result.source_title || "guion")
+        .replace(/[^a-z0-9]+/gi, "_")
+        .slice(0, 40);
+      await downloadAudioBase64(audio_base64, `guionviral_${safe}.mp3`);
+      showToast("Audio listo para guardar.", "success");
+    } catch (e) {
+      showToast(
+        e instanceof Error ? e.message : "No se pudo generar el audio.",
+        "error",
+      );
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -444,6 +471,21 @@ export default function GeneratorScreen() {
                 {result.script_generado}
               </Text>
             </ScrollView>
+            <Pressable
+              testID="download-audio-button"
+              onPress={downloadAudio}
+              disabled={downloading}
+              style={[styles.downloadBtn, downloading && styles.downloadBtnDisabled]}
+            >
+              {downloading ? (
+                <ActivityIndicator color={colors.brandPrimary} size="small" />
+              ) : (
+                <Ionicons name="download-outline" size={18} color={colors.brandPrimary} />
+              )}
+              <Text style={styles.downloadBtnText}>
+                {downloading ? "Generando audio…" : "Descargar audio (MP3)"}
+              </Text>
+            </Pressable>
             <Pressable
               testID="reset-button"
               onPress={resetAll}
@@ -736,6 +778,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displaySemi,
     fontSize: fontSize.base,
     color: colors.onSurfaceSecondary,
+  },
+  downloadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    height: 46,
+    borderRadius: radius.md,
+    backgroundColor: colors.brandTertiary,
+    borderWidth: 1,
+    borderColor: colors.brandSecondary,
+  },
+  downloadBtnDisabled: { opacity: 0.6 },
+  downloadBtnText: {
+    fontFamily: fonts.displaySemi,
+    fontSize: fontSize.lg,
+    color: colors.brandPrimary,
   },
   bottomBar: {
     paddingHorizontal: spacing.lg,
