@@ -1,0 +1,128 @@
+{
+  "app_name": "GuionViral",
+  "personality": "7 Dark-First Utility DARK",
+  "personality_one_liner": "A high-performance, command-center interface for rapid AI script generation and TTS playback.",
+  "color": {
+    "surface": "#090A0C",
+    "onSurface": "#F3F4F6",
+    "surfaceSecondary": "#121418",
+    "onSurfaceSecondary": "#D1D5DB",
+    "surfaceTertiary": "#1C1F26",
+    "onSurfaceTertiary": "#9CA3AF",
+    "surfaceInverse": "#F3F4F6",
+    "onSurfaceInverse": "#090A0C",
+    "brand": "#E63946",
+    "brandPrimary": "#FF4D5E",
+    "onBrandPrimary": "#1A0508",
+    "brandSecondary": "#B32935",
+    "onBrandSecondary": "#FEE2E2",
+    "brandTertiary": "#4C1217",
+    "onBrandTertiary": "#FECDD3",
+    "success": "#10B981",
+    "onSuccess": "#022C22",
+    "warning": "#F59E0B",
+    "onWarning": "#451A03",
+    "error": "#EF4444",
+    "onError": "#450A0A",
+    "info": "#3B82F6",
+    "onInfo": "#0F172A",
+    "border": "#1F232B",
+    "borderStrong": "#2D333E",
+    "divider": "#16191E"
+  },
+  "typography": {
+    "displayFontFamily": "Rajdhani",
+    "textFontFamily": "DM Sans",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Dense and tactical. Use dividers and tonal separation instead of shadows. Keep padding tight but readable.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 4,
+    "md": 8,
+    "lg": 12,
+    "pill": 999
+  },
+  "shadow_tier": 0,
+  "navigation": "bottom_tabs",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use on the floating TTS Audio Player controls over the scrolling script",
+      "Use on sticky headers or bottom tabs if content scrolls underneath"
+    ],
+    "dont's": [
+      "Do not use on list rows or form inputs",
+      "Do not use if it compromises the clarity of text underneath"
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Generator",
+      "purpose": "A command center to input links/text, trigger AI generation, and control the TTS playback.",
+      "states": {
+        "loading": "Full-screen dim overlay with an animated processing indicator, signaling AI analysis.",
+        "empty": "Clean input module awaiting a link or text. Bottom sticky CTA is disabled.",
+        "error": "Inline validation text under the input field in red, with a retry prompt."
+      },
+      "layout": "Top: Simple header. Middle: A stacked module for TextInput (URL or raw text). When a script is generated, the input module shrinks or collapses, and a ScrollView of the script takes over the screen. Bottom: A sticky CTA 'Procesar y Leer'. When playing, this CTA swaps out for a floating, glassmorphic Audio Player control bar (Play, Pause, Stop, Progress)."
+    },
+    {
+      "name": "History",
+      "purpose": "A fast-scanning list of previously generated scripts for quick replay.",
+      "states": {
+        "loading": "Skeleton list items matching the height of a standard history card.",
+        "empty": "A stylized empty state showing the microphone image with a call-to-action to generate the first script.",
+        "error": "Centered error message indicating DB failure with a retry button."
+      },
+      "layout": "A stacked list of cards on surfaceSecondary. Each card shows the truncated script text, date, and a prominent 'Play' button. Tapping a card opens a modal or navigates back to the Generator screen to play it. Tight spacing, using borders for separation instead of shadows."
+    }
+  ],
+  "images": {
+    "empty_state_microphone": {
+      "url": "https://images.pexels.com/photos/7301210/pexels-photo-7301210.jpeg",
+      "alt": "Dark studio microphone in shadows"
+    },
+    "hero_background_texture": {
+      "url": "https://images.pexels.com/photos/20818843/pexels-photo-20818843.jpeg",
+      "alt": "Abstract minimal dark fabric texture"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Adhere strictly to the '7 Dark-First Utility DARK' personality. Do not add heavy shadows; use borders and tonal differences for elevation.",
+    "Implement the 'Procesar y Leer' CTA as a sticky component above the safe area bottom.",
+    "The TTS audio controls MUST replace or overlay the primary CTA once a script is generated and playing. Use glassmorphism for this floating control bar so scrolling text is visible underneath.",
+    "When displaying text over images (e.g., hero backgrounds), ALWAYS use the mandatory vertical gradient-to-dark scrim (top -> bottom: transparent to ≥70% surfaceInverse).",
+    "No indigo, violet, blue, or purple colors. The accent color is Signal Red (brand). Use it sparingly for primary actions.",
+    "All app language and TTS configurations must be strictly in Spanish ('es' / 'es-ES' / 'es-MX').",
+    "Use SQLite or AsyncStorage to save generated scripts locally. Each history entry must store the text and date.",
+    "Web Search learnings: Modern AI content apps use minimalist, high-contrast layouts. The TTS player should feel like a native music player (clean controls, progress indication)."
+  ]
+}
