@@ -7,6 +7,7 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
+  Share,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
@@ -74,8 +75,18 @@ export default function HistoryScreen() {
     }
   };
 
-  const remove = async (id: string) => {
+  const share = async (item: ScriptItem) => {
     try {
+      await Share.share({
+        message: item.script_generado,
+        title: item.source_title || "Guion viral",
+      });
+    } catch {
+      setToast({ msg: "No se pudo compartir.", type: "error" });
+    }
+  };
+
+  const remove = async (id: string) => {    try {
       if (playingId === id) {
         stop();
         setPlayingId(null);
@@ -117,6 +128,14 @@ export default function HistoryScreen() {
               {dayjs(item.created_at).format("DD MMM YYYY · HH:mm")}
             </Text>
           </View>
+          <Pressable
+            testID={`share-${item.id}`}
+            onPress={() => share(item)}
+            hitSlop={8}
+            style={styles.deleteBtn}
+          >
+            <Ionicons name="share-social-outline" size={18} color={colors.brandPrimary} />
+          </Pressable>
           <Pressable
             testID={`delete-${item.id}`}
             onPress={() => remove(item.id)}

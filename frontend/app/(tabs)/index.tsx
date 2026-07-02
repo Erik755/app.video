@@ -9,6 +9,7 @@ import {
   ScrollView,
   Linking,
   Platform,
+  Share,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -193,6 +194,18 @@ export default function GeneratorScreen() {
     if (!result) return;
     await Clipboard.setStringAsync(result.script_generado);
     showToast("Guion copiado al portapapeles.", "success");
+  };
+
+  const shareScript = async () => {
+    if (!result) return;
+    try {
+      await Share.share({
+        message: result.script_generado,
+        title: result.source_title || "Guion viral",
+      });
+    } catch {
+      showToast("No se pudo compartir el guion.", "error");
+    }
   };
 
   const resetAll = () => {
@@ -388,6 +401,14 @@ export default function GeneratorScreen() {
               <Text style={styles.resultTitle} numberOfLines={1}>
                 {result.source_title || "Guion generado"}
               </Text>
+              <Pressable
+                testID="share-script-button"
+                onPress={shareScript}
+                hitSlop={8}
+                style={{ marginRight: spacing.md }}
+              >
+                <Ionicons name="share-social-outline" size={18} color={colors.brandPrimary} />
+              </Pressable>
               <Pressable
                 testID="copy-script-button"
                 onPress={copyScript}
