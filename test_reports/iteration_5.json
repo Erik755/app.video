@@ -1,0 +1,42 @@
+{
+  "summary": "GuionViral iteration 5 — validated the NEW /api/generate-frames endpoint (fix for the reported bug 'Falla con los videos que subo de mi dispositivo'). Backend: created /app/backend/tests/test_generate_frames.py with 6 tests, budget-aware (exactly ONE Gemini call). Built a 6-second testsrc mp4 via imageio-ffmpeg, extracted 3 JPEG frames at scale=640 with fps=1/2, base64-encoded and posted to POST /api/generate-frames with tone/style/description/title. Response: 200, source_type='upload', source_url=None, source_title='TEST_frames_success', tone='viral', style='energetico y directo', frames_used==3, used_fallback=false, script_generado non-empty (>30 chars), thumbnail is a data:image/jpeg;base64,... URI, no _id leak. Persistence verified via GET /api/history/{id} (same id, same fields, no _id). Validation errors: POST with frames=[] -> 400 ('No se recibieron fotogramas del video.'); POST with frames=['@@@','###'] -> 400 ('Los fotogramas no son válidos.'). Light regression (no Gemini): GET /api/ -> 200 'online'; GET /api/history -> 200 list without _id; POST /api/files/tts (nova, short text) -> 200 MediaItem with kind='audio', size>500, url='/api/files/{id}'; GET /api/files/{id} -> 200 with Content-Disposition attachment, Content-Type audio/mpeg, Content-Length==size, MP3 signature (ID3/0xFF); cleanup delete OK. Result: 6/6 PASSED in ~15s. Frontend smoke (mobile 390x844): app loads without JS errors, title 'GUIONVIRAL' visible, tabs 'Generar' and 'Historial' present, onboarding modal shows 'Empezar' as expected, testIDs mode-link and mode-text present. Only a benign 'props.pointerEvents is deprecated' console warning (pre-existing, non-blocking). No deprecated Expo packages / SafeAreaView issues detected in server.py or the tab screens.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_generate_frames.py",
+    "/app/test_reports/pytest/pytest_generate_frames.xml"
+  ],
+  "action_items": [
+    "(Info) Gallery mode key in /app/frontend/app/(tabs)/index.tsx renders testID mode-<key>. Query for 'mode-gallery' returned missing — the key appears to be a Spanish spelling (e.g. 'galeria'). Confirm the exact key so future Playwright tests can select the Galería mode. Non-blocking.",
+    "(Carried over) Extend ScriptItem.source_type union in /app/frontend/src/api.ts to include 'upload'/'text' (already used by backend).",
+    "(Carried over, optional) In /app/frontend/src/utils/audioDownload/index.web.ts, drop link.target='_blank' so Playwright can capture the download event; real browsers already honor Content-Disposition attachment."
+  ],
+  "critical_code_review_comments": [
+    "server.py /api/generate-frames: validates empty frames -> 400 and invalid base64 -> 400 (after silently skipping bad entries). Correct ordering: it collects successfully decoded frames first, then raises 400 if none remained. Verified.",
+    "server.py /api/generate-frames: cleans up workdir in finally block (shutil.rmtree ignore_errors=True). No temp-file leak.",
+    "server.py /api/generate-frames: caps frames at MAX_FRAMES+2 (=8) as a safety net, matches the ~6 the client sends.",
+    "server.py /api/generate-frames: persists ScriptItem to db.scripts and returns it; find({}, {_id:0}) in /api/history keeps the mongo _id out of API responses.",
+    "server.py _generate_script_with_gemini: computes target_words from duration_seconds when provided, so the guion length matches the video — correctly wired from FramesRequest.duration_seconds.",
+    "Response model ScriptItem has source_type='upload' for both /generate-upload and /generate-frames, so history rendering treats device-frame runs identically to full-upload runs (good UX consistency)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_generate_frames.py (new: 6 tests — /api/generate-frames success + 2 validation errors + 3 regression checks)"
+  ],
+  "success_rate": {
+    "backend": "100% (6/6 in test_generate_frames.py). Full regression not re-ran to preserve Gemini budget per agent note.",
+    "frontend": "Smoke passed: app loads, no red screen, no JS errors, tabs Generar/Historial present."
+  },
+  "seed_data_creation": "One ScriptItem with title 'TEST_frames_success' created by the success test; session teardown auto-deletes items whose source_title/script_generado contains 'TEST_'. TTS media created for the regression test is deleted in-line.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The device-side frames fix works end-to-end. New tests at /app/backend/tests/test_generate_frames.py; JUnit at /app/test_reports/pytest/pytest_generate_frames.xml. To reproduce the success path outside pytest: build /tmp/sample_frames.mp4 with imageio-ffmpeg (testsrc size=640x360 duration=6), extract 3 JPEGs at fps=1/2 scale=640, base64 them and POST to /api/generate-frames with {frames, duration_seconds:6, tone:'viral', style, description, title}. Preserve Gemini budget: ONE call per run. Frontend testIDs to select gallery mode still need confirmation (mode-<key> where key may be 'galeria').",
+  "rca_of_issue": "Original bug: uploading a full mobile video to /api/generate-upload was fragile (large size / .mov HEVC / flaky mobile networks). Fix: on native, the client extracts ~6 thumbnails locally with expo-video-thumbnails and posts only small JPEGs (base64) to the new POST /api/generate-frames endpoint. Server decodes/writes each JPEG to a temp dir, skips invalid entries, requires at least one valid frame (else 400), calls Gemini with the same _generate_script_with_gemini pipeline used by the link/upload paths, then persists a ScriptItem with source_type='upload'. Verified: success returns a real script (>30 chars) with thumbnail data URI, frames_used matches, and history persistence works; both empty and invalid-base64 payloads correctly return 400. Web path unchanged (/api/generate-upload continues to accept the full file)."
+}

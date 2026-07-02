@@ -119,6 +119,15 @@ class SaveTextRequest(BaseModel):
     title: Optional[str] = None
 
 
+class FramesRequest(BaseModel):
+    frames: List[str]  # fotogramas JPEG en base64 (extraídos en el dispositivo)
+    duration_seconds: Optional[float] = 0
+    tone: Optional[str] = "viral"
+    style: Optional[str] = None
+    description: Optional[str] = None
+    title: Optional[str] = None
+
+
 class TTSRequest(BaseModel):
     text: str
     voice: Optional[str] = None
@@ -466,6 +475,71 @@ async def generate_from_upload(
             tone=tone,
             style=style,
             frames_used=len(frames),
+            used_fallback=False,
+        )
+        await db.scripts.insert_one(item.dict())
+        return item
+    finally:
+        if workdir and os.path.isdir(workdir):
+            shutil.rmtree(workdir, ignore_errors=True)
+
+
+@api_router.post("/generate-frames", response_model=ScriptItem)
+async def generate_from_frames(req: FramesRequest):
+    """
+    Genera un guion a partir de FOTOGRAMAS ya extraídos en el dispositivo.
+    Evita subir el video completo (rápido y confiable en móviles, cualquier formato).
+    """
+    if not req.frames:
+        raise HTTPException(status_code=400, detail="No se recibieron fotogramas del video.")
+
+    workdir = tempfile.mkdtemp(prefix="guionviral_fr_")
+    try:
+        frame_paths: List[str] = []
+        for i, b64 in enumerate(req.frames[:MAX_FRAMES + 2]):
+            data = b64.split(",", 1)[1] if b64.startswith("data:") else b64
+            try:
+                raw = base64.b64decode(data)
+            except Exception:
+                continue
+            if not raw:
+                continue
+            p = os.path.join(workdir, f"frame_{i:03d}.jpg")
+            with open(p, "wb") as fh:
+                fh.write(raw)
+            frame_paths.append(p)
+
+        if not frame_paths:
+            raise HTTPException(status_code=400, detail="Los fotogramas no son válidos.")
+
+        thumb_uri = None
+        try:
+            with open(frame_paths[0], "rb") as fh:
+                thumb_uri = _thumb_to_datauri(fh.read())
+        except Exception:
+            thumb_uri = None
+
+        ctx = {
+            "title": req.title or "Video de galería",
+            "description": "",
+            "frame_paths": frame_paths,
+            "duration": req.duration_seconds or 0,
+        }
+        script = await _generate_script_with_gemini(
+            ctx, req.tone or "viral", req.style, req.description
+        )
+        if not script:
+            raise HTTPException(status_code=502, detail="La IA no devolvió ningún guion.")
+
+        item = ScriptItem(
+            source_type="upload",
+            source_url=None,
+            source_title=ctx["title"],
+            thumbnail=thumb_uri,
+            script_generado=script,
+            tone=req.tone or "viral",
+            style=req.style,
+            frames_used=len(frame_paths),
             used_fallback=False,
         )
         await db.scripts.insert_one(item.dict())

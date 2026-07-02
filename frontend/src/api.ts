@@ -123,6 +123,30 @@ export async function synthesizeAudio(
   return handle<{ audio_base64: string; mime: string; voice: string }>(res);
 }
 
+// Genera un guion a partir de fotogramas ya extraídos en el dispositivo.
+export async function generateFromFrames(
+  frames: string[],
+  durationSeconds: number,
+  tone: string,
+  style?: string,
+  description?: string,
+  title?: string,
+): Promise<ScriptItem> {
+  const res = await fetch(`${BASE}/api/generate-frames`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      frames,
+      duration_seconds: durationSeconds,
+      tone,
+      style,
+      description,
+      title,
+    }),
+  });
+  return handle<ScriptItem>(res);
+}
+
 export async function getHistory(): Promise<ScriptItem[]> {  const res = await fetch(`${BASE}/api/history`);
   return handle<ScriptItem[]>(res);
 }

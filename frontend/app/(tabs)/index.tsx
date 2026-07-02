@@ -26,6 +26,7 @@ import { useSpeech } from "@/src/hooks/useSpeech";
 import {
   generateFromLink,
   generateFromUpload,
+  generateFromFrames,
   saveText,
   ttsToStorage,
   mediaUrl,
@@ -37,10 +38,11 @@ import { VoicePicker } from "@/src/components/VoicePicker";
 import { HelpModal } from "@/src/components/HelpModal";
 import { useMp3Voice, OPENAI_VOICES } from "@/src/hooks/useMp3Voice";
 import { downloadAudioUrl } from "@/src/utils/audioDownload";
+import { extractFramesBase64 } from "@/src/utils/videoFrames";
 import { storage } from "@/src/utils/storage";
 
 type Mode = "link" | "upload" | "text";
-type PickedVideo = { uri: string; name: string; type: string };
+type PickedVideo = { uri: string; name: string; type: string; durationMs: number };
 
 const MODES: { key: Mode; label: string; icon: string }[] = [
   { key: "link", label: "Enlace", icon: "link" },
@@ -137,6 +139,7 @@ export default function GeneratorScreen() {
           uri: a.uri,
           name,
           type: a.mimeType || "video/mp4",
+          durationMs: (a as { duration?: number }).duration || 0,
         });
         setResult(null);
         stop();
@@ -193,7 +196,8 @@ export default function GeneratorScreen() {
           style.trim() || undefined,
           description.trim() || undefined,
         );
-      } else {
+      } else if (Platform.OS === "web") {
+        // En web se sube el archivo directamente (los videos suelen ser pequeños).
         item = await generateFromUpload(
           video!.uri,
           video!.name,
@@ -201,6 +205,23 @@ export default function GeneratorScreen() {
           tone,
           style.trim() || undefined,
           description.trim() || undefined,
+        );
+      } else {
+        // En móvil: extraer fotogramas en el dispositivo y enviar solo esas imágenes
+        // (evita subir el video completo: rápido y confiable para cualquier tamaño/formato).
+        const frames = await extractFramesBase64(video!.uri, video!.durationMs);
+        if (!frames.length) {
+          throw new Error(
+            "No se pudieron leer fotogramas del video. Intenta con otro archivo.",
+          );
+        }
+        item = await generateFromFrames(
+          frames,
+          (video!.durationMs || 0) / 1000,
+          tone,
+          style.trim() || undefined,
+          description.trim() || undefined,
+          video!.name,
         );
       }
       setResult(item);
