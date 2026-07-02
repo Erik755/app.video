@@ -16,14 +16,14 @@ Creador de contenido / uso personal que quiere generar guiones virales a partir 
 - Analizar video por enlace o subida de galería; campos opcionales estilo + descripción.
 - Guardar y reproducir historial.
 
-## Implemented (2026-06)
-- POST /api/generate (enlace), /api/generate-upload (video galería multipart), /api/save-text, /api/tts (OpenAI TTS tts-1 voz nova, MP3 base64), GET/DELETE /api/history.
+## Implemented (2026-06)- POST /api/generate (enlace), /api/generate-upload (video galería multipart), /api/save-text, /api/tts (OpenAI TTS tts-1 voz nova, MP3 base64), GET/DELETE /api/history.
 - ffmpeg empaquetado vía pip (imageio-ffmpeg) => persiste entre reinicios; extracción de frames con un solo comando (fps=1/2), sin ffprobe.
 - Generación con Gemini 2.5 Pro (image inputs).
 - Descarga de audio MP3 en Generador y en cada tarjeta del Historial (nativo: expo-file-system/legacy + expo-sharing; web: <a download>).
 - Modo Texto a voz: escribir cualquier texto y generar/descargar MP3.
 - Duración del guion ajustada a la duración del video: se calcula la duración (yt-dlp o ffmpeg) y se instruye a Gemini a producir ~palabras = duración * 2.4, rellenando con datos/conceptos/ideas de contexto (tope 300s). Verificado: video 20s -> 52 palabras.
 - Selección de voz de lectura (dispositivo) y voz del MP3 (9 voces OpenAI), persistidas.
+- File & media storage (MongoDB GridFS, sin credenciales externas): POST /api/files/tts (guarda MP3 y devuelve URL), POST /api/files/upload, GET /api/files, GET /api/files/{id} (stream/descarga), DELETE /api/files/{id}. La descarga de audio ahora usa URL del store en vez de base64. Verificado por testing agent (7/7).
 - Verificado por testing agent (iter 3): features de descarga MP3 y texto->MP3 OK.
 
 ## Known limitations
