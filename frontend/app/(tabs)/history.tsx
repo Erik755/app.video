@@ -17,8 +17,9 @@ import dayjs from "dayjs";
 
 import { colors, spacing, radius, fonts, fontSize } from "@/src/theme";
 import { useSpeech } from "@/src/hooks/useSpeech";
-import { getHistory, deleteHistoryItem, ScriptItem } from "@/src/api";
+import { getHistory, deleteHistoryItem, synthesizeAudio, ScriptItem } from "@/src/api";
 import { Toast } from "@/src/components/Toast";
+import { downloadAudioBase64 } from "@/src/utils/audioDownload";
 
 const EMPTY_IMG =
   "https://images.pexels.com/photos/7301210/pexels-photo-7301210.jpeg";
@@ -37,6 +38,7 @@ export default function HistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(
     null,
   );
@@ -86,6 +88,27 @@ export default function HistoryScreen() {
     }
   };
 
+  const downloadMp3 = async (item: ScriptItem) => {
+    if (downloadingId) return;
+    setDownloadingId(item.id);
+    setToast({ msg: "Generando audio…", type: "info" });
+    try {
+      const { audio_base64 } = await synthesizeAudio(item.script_generado);
+      const safe = (item.source_title || "guion")
+        .replace(/[^a-z0-9]+/gi, "_")
+        .slice(0, 40);
+      await downloadAudioBase64(audio_base64, `guionviral_${safe}.mp3`);
+      setToast({ msg: "Audio listo para guardar.", type: "success" });
+    } catch (e) {
+      setToast({
+        msg: e instanceof Error ? e.message : "No se pudo generar el audio.",
+        type: "error",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
   const remove = async (id: string) => {    try {
       if (playingId === id) {
         stop();
@@ -128,6 +151,19 @@ export default function HistoryScreen() {
               {dayjs(item.created_at).format("DD MMM YYYY · HH:mm")}
             </Text>
           </View>
+          <Pressable
+            testID={`download-${item.id}`}
+            onPress={() => downloadMp3(item)}
+            disabled={downloadingId === item.id}
+            hitSlop={8}
+            style={styles.deleteBtn}
+          >
+            {downloadingId === item.id ? (
+              <ActivityIndicator size="small" color={colors.brandPrimary} />
+            ) : (
+              <Ionicons name="download-outline" size={18} color={colors.brandPrimary} />
+            )}
+          </Pressable>
           <Pressable
             testID={`share-${item.id}`}
             onPress={() => share(item)}

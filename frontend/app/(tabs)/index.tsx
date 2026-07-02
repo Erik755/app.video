@@ -380,6 +380,10 @@ export default function GeneratorScreen() {
               multiline
               style={[styles.input, styles.multiline]}
             />
+            <Text style={styles.hint}>
+              Pulsa "Leer en voz alta" y luego "Descargar audio (MP3)" para
+              convertir cualquier texto en un archivo MP3.
+            </Text>
           </View>
         )}
 

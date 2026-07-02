@@ -133,6 +133,28 @@ class TestTTS:
         r = api.post(f"{BASE_URL}/api/tts", json={"text": "  "}, timeout=15)
         assert r.status_code == 400
 
+    def test_tts_long_text_nova(self, api):
+        # >150 chars to exercise the chunker / large payload path
+        long_text = (
+            "Hola a todos, bienvenidos a este experimento de texto a voz. "
+            "Vamos a validar que el backend genera un archivo MP3 real y "
+            "completo aunque el texto sea considerablemente largo, con "
+            "varias frases seguidas para forzar el pipeline de sintesis."
+        )
+        assert len(long_text) > 150
+        r = api.post(
+            f"{BASE_URL}/api/tts",
+            json={"text": long_text, "voice": "nova"},
+            timeout=120,
+        )
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data.get("voice") == "nova"
+        assert data.get("mime") == "audio/mpeg"
+        audio = base64.b64decode(data["audio_base64"])
+        assert len(audio) > 1000
+        assert audio[:3] == b"ID3" or audio[0] == 0xFF
+
 
 # ---------------- history ----------------
 class TestHistory:

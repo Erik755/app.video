@@ -1,0 +1,46 @@
+{
+  "summary": "GuionViral iteration 3 — validated new features: (a) POST /api/tts short + long (>150 chars) with voice='nova' returns 200 with valid MP3 (base64 starts with 'ID3' or 0xFF, bytes>1000) and mime='audio/mpeg'; empty text returns 400. (b) Frontend text mode (mode-text) end-to-end: typed long text, 'process-button' labeled 'Leer en voz alta' triggers save-text, 'result-card' + 'download-audio-button' appear, tapping it changes toast from 'Generando audio…' to 'Audio listo para guardar.' (SUCCESS toast confirmed, no error) and the browser fires a download of 'guionviral_Texto_directo.mp3' (captured by Playwright download event). (c) History cards expose testIDs download-<id>, share-<id>, play-<id>, delete-<id> (all 4 confirmed on 19 real cards); tapping download-<id> also produced the success toast 'Audio listo para guardar.' without error. (d) Regression: header 'clear-button' still clears text-input, 'voice-button' still opens the 'Voz de lectura' modal. Backend pytest: 11/12 passing — only failure is /api/generate-upload returning 500 due to Emergent LLM Gemini budget momentarily exceeded (env limitation, not code). All other flows (/api/save-text ok+400, /api/generate link 200 with fallback, /api/history no _id leak & DESC ordered, DELETE 200 and later GET 404, DELETE nonexistent 404) pass.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/generate-upload", "issue": "Returned 500 during this run: 'litellm.BadRequestError: OpenAIException - Budget has been exceeded! Current cost: 0.4293012500000001, Max budget: 0.401'. Endpoint code is fine (frames extracted OK); this is an Emergent LLM key budget/env limitation. Re-run typically succeeds (same test class passed in iteration 2)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Animated / RN Web", "issue": "Console warning: 'Animated: useNativeDriver is not supported because the native animated module is missing. Falling back to JS-based animation.' — expected on web preview but consider gating useNativeDriver=false when Platform.OS==='web' to remove noise. Reference: any component using Animated with useNativeDriver=true."},
+      {"component": "React Native Web deprecation", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' — comes from a dependency; monitor for upstream fix. Non-blocking."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_guionviral_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Investigate Emergent LLM Gemini budget quota for /api/generate-upload flows (upload path uses more tokens than tts). If it recurs frequently, either request a higher budget or shrink prompt/frames.",
+    "(Optional) Suppress web-only warnings by setting useNativeDriver=false when Platform.OS==='web'.",
+    "(Carried over) Update ScriptItem.source_type in /app/frontend/src/api.ts to include 'upload'/'text' unions."
+  ],
+  "critical_code_review_comments": [
+    "server.py TTS: chunks text at TTS_MAX_CHARS=3900 respecting sentence boundaries, validates voice against OpenAITextToSpeech.VOICES with 'nova' fallback, returns 400 on empty text and 502 on synthesis exceptions — clean and correct.",
+    "server.py: history reads all project {'_id':0} — no ObjectId leak (verified in tests).",
+    "history.tsx: adds testID download-<id>/share-<id>/play-<id>/delete-<id> per card and reuses downloadAudioBase64 util — verified all four present on real cards.",
+    "audioDownload/index.web.ts: uses data:audio/mpeg;base64 anchor click — works in preview; browser download event captured. Native variant (expo-file-system/legacy + expo-sharing) not exercisable in web preview per agent note.",
+    "(tabs)/index.tsx text mode: process-button labeled 'Leer en voz alta' with volume-high icon; downloadAudio() shows 'Generando audio…' then 'Audio listo para guardar.' — matches spec."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_guionviral_api.py (added TestTTS.test_tts_long_text_nova for >150 chars)"
+  ],
+  "success_rate": {
+    "backend": "91.6% (11/12) — only failure is env budget-limited /api/generate-upload",
+    "frontend": "100% of exercised flows (text-mode TTS download, history-card TTS download, clear-button, voice modal)"
+  },
+  "seed_data_creation": "Uses /tmp/sample.mp4 generated on demand via imageio_ffmpeg (testsrc 640x360 duration=4). Session-scoped teardown deletes items with TEST_ prefix. One 'Texto directo' item ('Hola a todos, bienvenidos a este experimento…') was created via UI test and remains in history (safe to ignore).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All new TTS/download features verified. Only intermittent issue is /api/generate-upload returning 500 when Emergent Gemini budget is exceeded — retry succeeds. Test file uses env EXPO_PUBLIC_BACKEND_URL only. testIDs of interest: mode-text, text-input, process-button, result-card, download-audio-button, download-<id>, share-<id>, play-<id>, delete-<id>, clear-button, voice-button.",
+  "rca_of_issue": "The single failing test (TestGenerateUpload) is due to Emergent LLM budget exceeded at the moment of the Gemini call (backend log shows ChatError with 'Budget has been exceeded! Current cost: 0.429..., Max budget: 0.401'). Frame extraction and multipart upload path work correctly; the failure is external. Mitigation: bump budget / retry / trim frames. TTS uses a different (OpenAI TTS) budget which was not saturated (all 3 TTS tests passed)."
+}
