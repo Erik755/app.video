@@ -70,6 +70,10 @@ GEMINI_MODEL = "gemini-2.5-pro"
 TTS_MODEL = "tts-1"
 TTS_DEFAULT_VOICE = "nova"
 TTS_MAX_CHARS = 3900
+# Ritmo aproximado de lectura del TTS en español (palabras por segundo).
+TTS_WORDS_PER_SEC = 2.4
+# Tope de duración objetivo para no disparar el costo con videos muy largos.
+MAX_TARGET_SECONDS = 300
 
 SYSTEM_PROMPT = (
     "Eres un experto creador de contenido viral en español. "
@@ -159,6 +163,23 @@ def _extract_frames(video_path: str, workdir: str, duration: float = 0.0) -> Lis
     return frames
 
 
+def _video_duration(video_path: str) -> float:
+    """Obtiene la duración (segundos) de un video parseando la salida de ffmpeg."""
+    if not (video_path and os.path.exists(video_path)):
+        return 0.0
+    try:
+        r = subprocess.run(
+            [FFMPEG_BIN, "-i", video_path], capture_output=True, text=True, timeout=30
+        )
+        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", r.stderr or "")
+        if m:
+            h, mn, s = m.groups()
+            return int(h) * 3600 + int(mn) * 60 + float(s)
+    except Exception as e:
+        logger.warning("No se pudo obtener duración: %s", e)
+    return 0.0
+
+
 def _extract_video_context(url: str) -> dict:
     """Trabajo síncrono y pesado para ENLACES. Se ejecuta en un hilo aparte."""
     import yt_dlp
@@ -220,6 +241,10 @@ def _extract_video_context(url: str) -> dict:
 
     result["frame_paths"] = _extract_frames(video_path, workdir, result["duration"])
 
+    # Si yt-dlp no dio duración, intentar obtenerla del archivo descargado.
+    if not result["duration"] and video_path and os.path.exists(video_path):
+        result["duration"] = _video_duration(video_path)
+
     # Respaldo: miniatura como único fotograma
     if not result["frame_paths"] and result["thumbnail_bytes"]:
         thumb_path = os.path.join(workdir, "thumb.jpg")
@@ -265,6 +290,23 @@ async def _generate_script_with_gemini(
         partes.append(f"Descripción disponible (metadatos): {description}")
     if user_description and user_description.strip():
         partes.append(f"El usuario describe el video así: {user_description.strip()}")
+
+    # Objetivo de duración: el guion, leído en voz alta, debe durar ~ lo mismo
+    # que el video de muestra. Estimamos las palabras necesarias por el ritmo TTS.
+    duration = float(ctx.get("duration") or 0)
+    target_seconds = min(duration, MAX_TARGET_SECONDS) if duration > 0 else 0
+    if target_seconds >= 1:
+        target_words = max(int(round(target_seconds * TTS_WORDS_PER_SEC)), 12)
+        partes.append(
+            f"IMPORTANTE — DURACIÓN: el video dura {int(round(target_seconds))} segundos. "
+            f"El guion, leído en voz alta a ritmo normal, debe durar aproximadamente esa "
+            f"misma cantidad de tiempo, es decir, unas {target_words} palabras (±10%). "
+            f"Si el contenido visual no da para tanto, COMPLETA con datos interesantes, "
+            f"conceptos, curiosidades, ideas y contexto adicional relacionados con el tema "
+            f"del video, de forma fluida, original y coherente (nada de relleno vacío ni "
+            f"repeticiones). Ajusta la extensión para cumplir la duración objetivo."
+        )
+
     partes.append(
         f"A continuación se muestran {len(frames)} fotograma(s) extraído(s) del video. "
         f"Analiza el tema, el tono y la estructura visual del contenido y crea un guion "
@@ -379,6 +421,9 @@ async def generate_from_upload(
                 detail="No se pudieron extraer fotogramas del video. Intenta con otro archivo.",
             )
 
+        # Duración real del video subido (para ajustar la longitud del guion).
+        duration = await asyncio.to_thread(_video_duration, video_path)
+
         # Miniatura para el historial: primer fotograma en base64.
         thumb_uri = None
         try:
@@ -391,6 +436,7 @@ async def generate_from_upload(
             "title": title or (file.filename or "Video de galería"),
             "description": "",
             "frame_paths": frames,
+            "duration": duration,
         }
         script = await _generate_script_with_gemini(ctx, tone, style, description)
         if not script:

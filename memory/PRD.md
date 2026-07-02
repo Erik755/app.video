@@ -22,7 +22,8 @@ Creador de contenido / uso personal que quiere generar guiones virales a partir 
 - Generación con Gemini 2.5 Pro (image inputs).
 - Descarga de audio MP3 en Generador y en cada tarjeta del Historial (nativo: expo-file-system/legacy + expo-sharing; web: <a download>).
 - Modo Texto a voz: escribir cualquier texto y generar/descargar MP3.
-- Selección de voz (expo-speech, persistida), botón limpiar/reiniciar, compartir.
+- Duración del guion ajustada a la duración del video: se calcula la duración (yt-dlp o ffmpeg) y se instruye a Gemini a producir ~palabras = duración * 2.4, rellenando con datos/conceptos/ideas de contexto (tope 300s). Verificado: video 20s -> 52 palabras.
+- Selección de voz de lectura (dispositivo) y voz del MP3 (9 voces OpenAI), persistidas.
 - Verificado por testing agent (iter 3): features de descarga MP3 y texto->MP3 OK.
 
 ## Known limitations
