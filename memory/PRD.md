@@ -17,13 +17,17 @@ Creador de contenido / uso personal que quiere generar guiones virales a partir 
 - Guardar y reproducir historial.
 
 ## Implemented (2026-06)
-- POST /api/generate (enlace), /api/generate-upload (video galería multipart), /api/save-text, GET/DELETE /api/history.
-- Extracción de fotogramas con ffmpeg (fallback a miniatura si la descarga falla).
+- POST /api/generate (enlace), /api/generate-upload (video galería multipart), /api/save-text, /api/tts (OpenAI TTS tts-1 voz nova, MP3 base64), GET/DELETE /api/history.
+- ffmpeg empaquetado vía pip (imageio-ffmpeg) => persiste entre reinicios; extracción de frames con un solo comando (fps=1/2), sin ffprobe.
 - Generación con Gemini 2.5 Pro (image inputs).
-- Pantalla Generar: modos Enlace/Galería/Texto, campos opcionales estilo y descripción, presets de tono, overlay de carga, tarjeta de resultado, barra glass de reproducción TTS (play/pausa/stop), copiar.
-- Pantalla Historial: lista, pull-to-refresh, reproducir/detener, eliminar, estado vacío.
-- Permisos de galería (expo-image-picker) con manejo de denegación + "Abrir Ajustes".
-- Verificado por testing agent (backend 9/9, frontend flujos OK).
+- Descarga de audio MP3 en Generador y en cada tarjeta del Historial (nativo: expo-file-system/legacy + expo-sharing; web: <a download>).
+- Modo Texto a voz: escribir cualquier texto y generar/descargar MP3.
+- Selección de voz (expo-speech, persistida), botón limpiar/reiniciar, compartir.
+- Verificado por testing agent (iter 3): features de descarga MP3 y texto->MP3 OK.
+
+## Known limitations
+- Análisis de video (Gemini) puede fallar si la Universal Key de Emergent se queda sin saldo (error de presupuesto). Solución: Profile -> Universal Key -> Add Balance.
+- La descarga nativa (guardar en el celular) solo se valida en dispositivo real / Expo Go, no en preview web.
 
 ## Backlog / Next
 - P1: Ajuste de velocidad/voz TTS y selector de voz (es-ES/es-MX).
