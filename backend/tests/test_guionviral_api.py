@@ -4,13 +4,16 @@ Covers: health, save-text, generate-upload (multipart mp4), generate (link),
 history listing (no _id leak), and history item deletion.
 """
 import os
+import base64
 import subprocess
 import pytest
 import requests
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL") or os.environ.get(
-    "EXPO_BACKEND_URL"
-) or "https://viral-content-maker-26.preview.emergentagent.com"
+BASE_URL = (
+    os.environ.get("EXPO_PUBLIC_BACKEND_URL")
+    or os.environ.get("EXPO_BACKEND_URL")
+)
+assert BASE_URL, "EXPO_PUBLIC_BACKEND_URL / EXPO_BACKEND_URL must be set"
 BASE_URL = BASE_URL.rstrip("/")
 
 SAMPLE_MP4 = "/tmp/sample.mp4"
@@ -18,10 +21,13 @@ SAMPLE_MP4 = "/tmp/sample.mp4"
 
 @pytest.fixture(scope="session", autouse=True)
 def ensure_sample_mp4():
+    """Create sample MP4 using imageio-ffmpeg (persistent across container restarts)."""
     if not os.path.exists(SAMPLE_MP4) or os.path.getsize(SAMPLE_MP4) == 0:
+        import imageio_ffmpeg
+        ffmpeg_bin = imageio_ffmpeg.get_ffmpeg_exe()
         subprocess.run(
-            ["ffmpeg", "-y", "-f", "lavfi", "-i",
-             "testsrc=size=640x360:rate=10:duration=3",
+            [ffmpeg_bin, "-y", "-f", "lavfi", "-i",
+             "testsrc=size=640x360:rate=10:duration=4",
              "-pix_fmt", "yuv420p", SAMPLE_MP4],
             capture_output=True, timeout=60, check=True,
         )
@@ -105,6 +111,26 @@ class TestGenerateLink:
 
     def test_generate_link_empty_url(self, api):
         r = api.post(f"{BASE_URL}/api/generate", json={"url": ""}, timeout=15)
+        assert r.status_code == 400
+
+
+# ---------------- history ----------------
+class TestTTS:
+    def test_tts_nova_returns_mp3(self, api):
+        payload = {"text": "Hola, esto es una prueba corta.", "voice": "nova"}
+        r = api.post(f"{BASE_URL}/api/tts", json=payload, timeout=60)
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data.get("voice") == "nova"
+        assert data.get("mime") == "audio/mpeg"
+        assert data.get("audio_base64")
+        audio = base64.b64decode(data["audio_base64"])
+        assert len(audio) > 500  # non-trivial MP3
+        # MP3 file signature: 'ID3' or MPEG frame sync (0xFF 0xFB / 0xFF 0xF3 / 0xFF 0xF2)
+        assert audio[:3] == b"ID3" or audio[0] == 0xFF
+
+    def test_tts_empty_rejected(self, api):
+        r = api.post(f"{BASE_URL}/api/tts", json={"text": "  "}, timeout=15)
         assert r.status_code == 400
 
 

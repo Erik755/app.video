@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 2 verification for GuionViral (Expo + FastAPI + MongoDB). Backend: 11/11 pytest tests pass. Verified the ffmpeg regression fix: /api/generate-upload with a real MP4 (generated via imageio_ffmpeg from testsrc lavfi filter) returns 200 with source_type='upload', frames_used>=1, non-empty script_generado, thumbnail data-uri, and no _id leak. /api/generate (YouTube link) returns 200 (thumbnail fallback used in sandbox). NEW /api/tts test: {text, voice:'nova'} returns 200 with valid MP3 (base64 decodes to >500 bytes and starts with 'ID3' or MPEG frame sync 0xFF), mime 'audio/mpeg'. save-text success + 400 on empty, history list is desc-ordered and has no _id, DELETE existing returns deleted:true and subsequent GET returns 404, DELETE nonexistent returns 404. Frontend (mobile viewport 390x844): NEW clear-button feature works — after generating a text-mode result (result-card visible), pressing header 'clear-button' removes result-card and empties text-input (screenshot confirms). Regression: voice-button opens 'Voz de lectura' modal, download-audio-button renders inside result-card. Only console warning present is a dependency-level 'props.pointerEvents is deprecated' (not blocking).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_guionviral_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL/TYPING (carried over from iteration_1): Update ScriptItem.source_type in /app/frontend/src/api.ts to include 'upload' — backend returns source_type='upload' for /api/generate-upload."
+  ],
+  "critical_code_review_comments": [
+    "server.py: ffmpeg dependency now provided by imageio_ffmpeg (pip) and referenced through FFMPEG_BIN — resolves the container-restart regression. yt_dlp is also configured with ffmpeg_location=FFMPEG_BIN.",
+    "server.py _extract_frames uses a single ffmpeg pass (fps=1/2, MAX_FRAMES=6) with a first-frame fallback for short videos — matches the 4-second sample used in tests (yields 1-2 frames).",
+    "server.py: no _id leaking (all history reads project {'_id':0}); async I/O via motor + asyncio.to_thread for CPU/blocking ops.",
+    "TTS endpoint: chunks long text, validates voice against OpenAITextToSpeech.VOICES, returns 400 on empty text, 502 on synthesis failure.",
+    "Frontend (tabs)/index.tsx: header includes testID='clear-button' with resetAll() clearing url/text/description/style/video/result — verified end-to-end.",
+    "All UI uses RN components + StyleSheet.create; EXPO_PUBLIC_BACKEND_URL from env; testIDs on all interactive elements."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_guionviral_api.py (added TestTTS class + switched sample-mp4 fixture to imageio_ffmpeg; removed hardcoded BASE_URL default)"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11)",
+    "frontend": "100% of exercised flows (clear-button clears text + result, voice modal opens, download-audio-button visible, mode switch, text-mode /api/save-text integration)"
+  },
+  "seed_data_creation": "Sample MP4 at /tmp/sample.mp4 regenerated on demand via imageio_ffmpeg. Session-scoped teardown deletes items with 'TEST_' prefix from history. One 'TEST_clear button verification GuionViral.' item was created during the UI test via /api/save-text; it will be visible in History until cleaned up (safe to ignore or delete).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend + all requested features verified. Test file uses env EXPO_PUBLIC_BACKEND_URL only. Run tests with: EXPO_PUBLIC_BACKEND_URL=<public url> pytest /app/backend/tests/test_guionviral_api.py -v. Frontend testIDs relevant to this feature set: clear-button, voice-button, download-audio-button, result-card, result-text, text-input, mode-text, process-button.",
+  "rca_of_issue": "Previous regression RCA (verified fixed): apt-installed ffmpeg was not persistent across container rebuilds; /api/generate-upload returned 502 because subprocess couldn't find 'ffmpeg'. Fix in server.py imports imageio_ffmpeg and uses FFMPEG_BIN=imageio_ffmpeg.get_ffmpeg_exe() (pip-installed, persistent). _extract_frames was also simplified to a single ffmpeg pass without ffprobe, with a first-frame fallback for short videos. Verified: upload of a 4-second testsrc MP4 returns 200 with frames_used>=1 and a Gemini-generated Spanish script."
+}

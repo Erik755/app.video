@@ -261,6 +261,13 @@ export default function GeneratorScreen() {
             </Text>
           </View>
           <Pressable
+            testID="clear-button"
+            onPress={resetAll}
+            style={styles.iconHeaderBtn}
+          >
+            <Ionicons name="refresh" size={18} color={colors.onSurfaceSecondary} />
+          </Pressable>
+          <Pressable
             testID="voice-button"
             onPress={() => setVoiceOpen(true)}
             style={styles.voiceBtn}
@@ -597,6 +604,16 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingHorizontal: spacing.md,
     height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  iconHeaderBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
     borderRadius: radius.md,
     backgroundColor: colors.surfaceSecondary,
     borderWidth: 1,

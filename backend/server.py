@@ -56,6 +56,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger("guionviral")
 
+# ffmpeg empaquetado vía pip (imageio-ffmpeg) para que persista entre reinicios
+# del contenedor (una instalación con apt no sobrevive a un rebuild).
+try:
+    import imageio_ffmpeg
+
+    FFMPEG_BIN = imageio_ffmpeg.get_ffmpeg_exe()
+except Exception:  # pragma: no cover
+    FFMPEG_BIN = "ffmpeg"
+
 MAX_FRAMES = 6
 GEMINI_MODEL = "gemini-2.5-pro"
 TTS_MODEL = "tts-1"
@@ -107,45 +116,46 @@ class TTSRequest(BaseModel):
 
 
 # --------------------------- Utilidades de video ---------------------------
-def _probe_duration(video_path: str) -> float:
-    try:
-        probe = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", video_path],
-            capture_output=True, text=True, timeout=30,
-        )
-        return float(probe.stdout.strip())
-    except Exception:
-        return 0.0
-
-
 def _extract_frames(video_path: str, workdir: str, duration: float = 0.0) -> List[str]:
-    """Extrae hasta MAX_FRAMES fotogramas espaciados de un archivo de video."""
+    """
+    Extrae fotogramas de un video con un único comando ffmpeg (sin ffprobe).
+    Toma 1 fotograma cada ~2s hasta MAX_FRAMES; si el video es muy corto y no
+    se obtiene nada, cae a extraer el primer fotograma.
+    """
     frames: List[str] = []
     if not (video_path and os.path.exists(video_path) and os.path.getsize(video_path) > 0):
         return frames
 
-    if not duration:
-        duration = _probe_duration(video_path)
+    pattern = os.path.join(workdir, "frame_%03d.jpg")
+    try:
+        subprocess.run(
+            [FFMPEG_BIN, "-y", "-i", video_path,
+             "-vf", "fps=1/2,scale=640:-1", "-frames:v", str(MAX_FRAMES),
+             "-q:v", "4", pattern],
+            capture_output=True, timeout=90,
+        )
+    except Exception as e:
+        logger.warning("ffmpeg (fps) falló: %s", e)
 
-    if duration and duration > 1:
-        step = duration / (MAX_FRAMES + 1)
-        timestamps = [round(step * (i + 1), 2) for i in range(MAX_FRAMES)]
-    else:
-        timestamps = [0]
+    for i in range(1, MAX_FRAMES + 1):
+        p = os.path.join(workdir, f"frame_{i:03d}.jpg")
+        if os.path.exists(p) and os.path.getsize(p) > 0:
+            frames.append(p)
 
-    for idx, ts in enumerate(timestamps):
-        out = os.path.join(workdir, f"frame_{idx:03d}.jpg")
+    # Respaldo: primer fotograma para videos muy cortos.
+    if not frames:
+        out = os.path.join(workdir, "frame_first.jpg")
         try:
             subprocess.run(
-                ["ffmpeg", "-y", "-ss", str(ts), "-i", video_path,
-                 "-frames:v", "1", "-vf", "scale=640:-1", "-q:v", "4", out],
-                capture_output=True, timeout=30,
+                [FFMPEG_BIN, "-y", "-i", video_path, "-frames:v", "1",
+                 "-vf", "scale=640:-1", "-q:v", "4", out],
+                capture_output=True, timeout=45,
             )
             if os.path.exists(out) and os.path.getsize(out) > 0:
                 frames.append(out)
         except Exception as e:
-            logger.warning("ffmpeg falló en ts=%s: %s", ts, e)
+            logger.warning("ffmpeg (primer frame) falló: %s", e)
+
     return frames
 
 
@@ -196,6 +206,7 @@ def _extract_video_context(url: str) -> dict:
             "merge_output_format": "mp4",
             "socket_timeout": 25,
             "noplaylist": True,
+            "ffmpeg_location": FFMPEG_BIN,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
