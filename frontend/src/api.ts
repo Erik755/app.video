@@ -3,12 +3,13 @@ const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 export type ScriptItem = {
   id: string;
-  source_type: "link" | "text";
+  source_type: "link" | "upload" | "text";
   source_url?: string | null;
   source_title?: string | null;
   thumbnail?: string | null;
   script_generado: string;
   tone?: string | null;
+  style?: string | null;
   frames_used: number;
   used_fallback: boolean;
   created_at: string;
