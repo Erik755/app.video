@@ -1,0 +1,2 @@
+cd /app/frontend
+npx --yes eas-cli build --platform android --profile preview
