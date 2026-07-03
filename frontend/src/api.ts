@@ -105,7 +105,23 @@ export async function ttsToStorage(
   });
   return handle<MediaItem>(res);
 }
+export async function mergeVideoAudio(
+  videoUri: string,
+  videoName: string,
+  videoType: string,
+  audioUri: string,
+): Promise<MediaItem> {
+  const form = new FormData();
+  form.append("video", { uri: videoUri, name: videoName, type: videoType } as any);
+  form.append("audio", { uri: audioUri, name: "audio.mp3", type: "audio/mpeg" } as any);
 
+  const res = await fetch(`${BASE_URL}/api/merge-video-audio`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 // Convierte la ruta relativa del store en una URL absoluta descargable.
 export function mediaUrl(path: string): string {
   return `${BASE}${path}`;
