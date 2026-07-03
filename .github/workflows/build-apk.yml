@@ -64,8 +64,7 @@ jobs:
           files: frontend/android/app/build/outputs/apk/release/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  eas-build:
+eas-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,8 +78,8 @@ jobs:
         run: |
           npm install -g eas-cli
 
-- name: Build Android App with EAS
-  working-directory: ./frontend
-  env:
-    EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-  run: npx --yes eas-cli build --platform android --profile preview --non-interactive
+      - name: Build Android App with EAS
+        working-directory: ./frontend
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx --yes eas-cli build --platform android --profile preview --non-interactive
