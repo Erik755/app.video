@@ -1,22 +1,6 @@
 // Cliente HTTP hacia el backend FastAPI. La URL base viene del .env de Expo.
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
-export async function mergeVideoAudio(
-  videoUri: string,
-  videoName: string,
-  videoType: string,
-  audioUri: string,
-): Promise<MediaItem> {
-  const form = new FormData();
-  form.append("video", { uri: videoUri, name: videoName, type: videoType } as any);
-  form.append("audio", { uri: audioUri, name: "audio.mp3", type: "audio/mpeg" } as any);
 
-  const res = await fetch(`${BASE_URL}/api/merge-video-audio`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
 export type ScriptItem = {
   id: string;
   source_type: "link" | "upload" | "text";
@@ -28,6 +12,16 @@ export type ScriptItem = {
   style?: string | null;
   frames_used: number;
   used_fallback: boolean;
+  created_at: string;
+};
+
+export type MediaItem = {
+  id: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  kind: string;
+  url: string; // ruta relativa: /api/files/{id}
   created_at: string;
 };
 
@@ -43,6 +37,24 @@ async function handle<T>(res: Response): Promise<T> {
     throw new Error(detail);
   }
   return res.json() as Promise<T>;
+}
+
+export async function mergeVideoAudio(
+  videoUri: string,
+  videoName: string,
+  videoType: string,
+  audioUri: string,
+): Promise<MediaItem> {
+  const form = new FormData();
+  form.append("video", { uri: videoUri, name: videoName, type: videoType } as any);
+  form.append("audio", { uri: audioUri, name: "audio.mp3", type: "audio/mpeg" } as any);
+
+  // Corregido: BASE en lugar de BASE_URL
+  const res = await fetch(`${BASE}/api/merge-video-audio`, {
+    method: "POST",
+    body: form,
+  });
+  return handle<MediaItem>(res);
 }
 
 export async function generateFromLink(
@@ -99,16 +111,6 @@ export async function saveText(
   return handle<ScriptItem>(res);
 }
 
-export type MediaItem = {
-  id: string;
-  filename: string;
-  content_type: string;
-  size: number;
-  kind: string;
-  url: string; // ruta relativa: /api/files/{id}
-  created_at: string;
-};
-
 // Genera el MP3 en el servidor, lo guarda en el store y devuelve su URL de descarga.
 export async function ttsToStorage(
   text: string,
@@ -121,23 +123,7 @@ export async function ttsToStorage(
   });
   return handle<MediaItem>(res);
 }
-export async function mergeVideoAudio(
-  videoUri: string,
-  videoName: string,
-  videoType: string,
-  audioUri: string,
-): Promise<MediaItem> {
-  const form = new FormData();
-  form.append("video", { uri: videoUri, name: videoName, type: videoType } as any);
-  form.append("audio", { uri: audioUri, name: "audio.mp3", type: "audio/mpeg" } as any);
 
-  const res = await fetch(`${BASE_URL}/api/merge-video-audio`, {
-    method: "POST",
-    body: form,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
 // Convierte la ruta relativa del store en una URL absoluta descargable.
 export function mediaUrl(path: string): string {
   return `${BASE}${path}`;
@@ -170,6 +156,14 @@ export async function generateFromFrames(
     body: JSON.stringify({
       frames,
       duration_seconds: durationSeconds,
+      tone,
+      style,
+      description,
+      title
+    }),
+  });
+  return handle<ScriptItem>(res);
+}
       tone,
       style,
       description,
