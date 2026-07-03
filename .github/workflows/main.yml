@@ -1,2 +1,30 @@
-cd /app/frontend
-npx --yes eas-cli build --platform android --profile preview
+name: EAS Android Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: # Te permite ejecutar el pipeline manualmente desde la pestaña "Actions" en GitHub
+
+jobs:
+  eas-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install EAS CLI
+        run: |
+          npm install -g eas-cli
+
+      - name: Build Android App with EAS
+        working-directory: ./frontend
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx --yes eas-cli build --platform android --profile preview --non-interactive
