@@ -79,9 +79,8 @@ jobs:
         run: |
           npm install -g eas-cli
 
-      - name: Start EAS cloud build
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: |
-          cd frontend
-          npx --yes eas-cli build --platform android --profile preview --non-interactive
+- name: Build Android App with EAS
+  working-directory: ./frontend
+  env:
+    EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+  run: npx --yes eas-cli build --platform android --profile preview --non-interactive
