@@ -1,6 +1,22 @@
 // Cliente HTTP hacia el backend FastAPI. La URL base viene del .env de Expo.
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
+export async function mergeVideoAudio(
+  videoUri: string,
+  videoName: string,
+  videoType: string,
+  audioUri: string,
+): Promise<MediaItem> {
+  const form = new FormData();
+  form.append("video", { uri: videoUri, name: videoName, type: videoType } as any);
+  form.append("audio", { uri: audioUri, name: "audio.mp3", type: "audio/mpeg" } as any);
 
+  const res = await fetch(`${BASE_URL}/api/merge-video-audio`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
 export type ScriptItem = {
   id: string;
   source_type: "link" | "upload" | "text";
