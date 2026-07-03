@@ -9,7 +9,7 @@ Pipeline (POST /api/generate para enlaces, POST /api/generate-upload para video 
       Gemini 2.5 Pro para analizar tema/tono/estructura y generar un guion ORIGINAL viral en español.
   4.  El guion se guarda en MongoDB (historial) y se devuelve a la app para leerlo en voz alta.
 """
-
+import aiofiles, subprocess, shutil, tempfile, time, os
 import os
 import re
 import uuid
@@ -775,7 +775,56 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.post("/api/merge-video-audio")
+async def merge_video_audio(
+    video: UploadFile = File(...),
+    audio: UploadFile = File(...),
+):
+    """Mezcla un video con un audio MP3 generado y devuelve el video final."""
+    work_dir = tempfile.mkdtemp()
+    try:
+        # Guardar video y audio en disco temporal
+        video_path = os.path.join(work_dir, "input_video" + os.path.splitext(video.filename or ".mp4")[1])
+        audio_path = os.path.join(work_dir, "input_audio.mp3")
+        output_path = os.path.join(work_dir, "output.mp4")
 
+        async with aiofiles.open(video_path, "wb") as f:
+            while chunk := await video.read(1024 * 1024):
+                await f.write(chunk)
+
+        async with aiofiles.open(audio_path, "wb") as f:
+            while chunk := await audio.read(1024 * 1024):
+                await f.write(chunk)
+
+        # ffmpeg: reemplaza el audio del video con el generado
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-i", audio_path,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            output_path,
+        ]
+        proc = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True, text=True
+        )
+        if proc.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"ffmpeg error: {proc.stderr}")
+
+        # Leer el video resultante y guardarlo en GridFS
+        async with aiofiles.open(output_path, "rb") as f:
+            video_bytes = await f.read()
+
+        timestamp = int(time.time())
+        filename = f"guionviral_video_{timestamp}.mp4"
+        media = await _store_media(video_bytes, filename, "video/mp4")
+        return media
+
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
