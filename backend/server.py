@@ -605,4 +605,226 @@ async def _synthesize_tts(text: str, voice: str) -> bytes:
 
 @api_router.post("/tts")
 async def synthesize_audio(req: TTSRequest):
-    """Genera un archivo MP3 (base64) a partir del texto para descargar en la
+    """Genera un archivo MP3 (base64) a partir del texto para descargar en la app."""
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="El texto no puede estar vacío.")
+    voice = req.voice or TTS_DEFAULT_VOICE
+    if voice not in OpenAITextToSpeech.VOICES:
+        voice = TTS_DEFAULT_VOICE
+    try:
+        audio = await _synthesize_tts(text, voice)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Fallo TTS: %s", e)
+        raise HTTPException(status_code=502, detail="No se pudo generar el audio.")
+    return {
+        "audio_base64": base64.b64encode(audio).decode("utf-8"),
+        "mime": "audio/mpeg",
+        "voice": voice,
+    }
+
+
+# --------------------------- Almacenamiento de archivos/media ---------------------------
+def _guess_kind(content_type: str) -> str:
+    if content_type.startswith("audio"):
+        return "audio"
+    if content_type.startswith("image"):
+        return "image"
+    if content_type.startswith("video"):
+        return "video"
+    return "file"
+
+
+async def _store_media(data: bytes, filename: str, content_type: str) -> MediaItem:
+    """Guarda bytes en GridFS + metadatos en la colección `media`. Devuelve MediaItem."""
+    kind = _guess_kind(content_type)
+    file_id = await fs.upload_from_stream(
+        filename, data, metadata={"content_type": content_type, "kind": kind}
+    )
+    fid = str(file_id)
+    created_at = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": fid,
+        "filename": filename,
+        "content_type": content_type,
+        "size": len(data),
+        "kind": kind,
+        "url": f"/api/files/{fid}",
+        "created_at": created_at,
+    }
+    await db.media_files.insert_one(dict(doc))
+    return MediaItem(**doc)
+
+
+@api_router.post("/files/tts", response_model=MediaItem)
+async def tts_to_storage(req: TTSRequest):
+    """Sintetiza el texto con OpenAI TTS, lo guarda en el store y devuelve una URL."""
+    text = (req.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="El texto no puede estar vacío.")
+    voice = req.voice or TTS_DEFAULT_VOICE
+    if voice not in OpenAITextToSpeech.VOICES:
+        voice = TTS_DEFAULT_VOICE
+    try:
+        audio = await _synthesize_tts(text, voice)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning("Fallo TTS storage: %s", e)
+        raise HTTPException(status_code=502, detail="No se pudo generar el audio.")
+    filename = f"guionviral_{voice}_{int(datetime.now(timezone.utc).timestamp())}.mp3"
+    return await _store_media(audio, filename, "audio/mpeg")
+
+
+@api_router.post("/files/upload", response_model=MediaItem)
+async def upload_media(file: UploadFile = File(...)):
+    """Sube cualquier archivo (imagen, audio, video, etc.) al store y devuelve una URL."""
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="El archivo está vacío.")
+    filename = file.filename or "archivo"
+    content_type = file.content_type or "application/octet-stream"
+    return await _store_media(data, filename, content_type)
+
+
+@api_router.get("/files", response_model=List[MediaItem])
+async def list_media():
+    docs = await db.media_files.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return [MediaItem(**d) for d in docs]
+
+
+@api_router.get("/files/{file_id}")
+async def download_media(file_id: str):
+    """Descarga/stream de un archivo del store (URL recuperable)."""
+    doc = await db.media_files.find_one({"id": file_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado.")
+    try:
+        grid_out = await fs.open_download_stream(ObjectId(file_id))
+    except Exception:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado.")
+
+    async def _stream():
+        while True:
+            chunk = await grid_out.readchunk()
+            if not chunk:
+                break
+            yield chunk
+
+    return StreamingResponse(
+        _stream(),
+        media_type=doc["content_type"],
+        headers={
+            "Content-Disposition": f'attachment; filename="{doc["filename"]}"',
+            "Content-Length": str(doc["size"]),
+        },
+    )
+
+
+@api_router.delete("/files/{file_id}")
+async def delete_media(file_id: str):
+    doc = await db.media_files.find_one({"id": file_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado.")
+    try:
+        await fs.delete(ObjectId(file_id))
+    except Exception as e:
+        logger.warning("No se pudo borrar de GridFS: %s", e)
+    await db.media_files.delete_one({"id": file_id})
+    return {"deleted": True, "id": file_id}
+
+
+@api_router.get("/history", response_model=List[ScriptItem])
+async def get_history():
+    docs = (
+        await db.scripts.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    )
+    return [ScriptItem(**d) for d in docs]
+
+
+@api_router.get("/history/{item_id}", response_model=ScriptItem)
+async def get_history_item(item_id: str):
+    doc = await db.scripts.find_one({"id": item_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Guion no encontrado.")
+    return ScriptItem(**doc)
+
+
+@api_router.delete("/history/{item_id}")
+async def delete_history_item(item_id: str):
+    res = await db.scripts.delete_one({"id": item_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Guion no encontrado.")
+    return {"deleted": True, "id": item_id}
+
+
+@api_router.delete("/history")
+async def clear_history():
+    res = await db.scripts.delete_many({})
+    return {"deleted": res.deleted_count}
+
+
+@api_router.post("/merge-video-audio")
+async def merge_video_audio(
+    video: UploadFile = File(...),
+    audio: UploadFile = File(...),
+):
+    """Mezcla un video con un audio MP3 generado y devuelve el video final."""
+    work_dir = tempfile.mkdtemp()
+    try:
+        ext = os.path.splitext(video.filename or ".mp4")[1] or ".mp4"
+        video_path = os.path.join(work_dir, f"input_video{ext}")
+        audio_path = os.path.join(work_dir, "input_audio.mp3")
+        output_path = os.path.join(work_dir, "output.mp4")
+
+        async with aiofiles.open(video_path, "wb") as f:
+            while chunk := await video.read(1024 * 1024):
+                await f.write(chunk)
+
+        async with aiofiles.open(audio_path, "wb") as f:
+            while chunk := await audio.read(1024 * 1024):
+                await f.write(chunk)
+
+        # Usando la variable FFMPEG_BIN dinámica en lugar de quemar "ffmpeg"
+        cmd = [
+            FFMPEG_BIN, "-y",
+            "-i", video_path,
+            "-i", audio_path,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            output_path,
+        ]
+        proc = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True, text=True
+        )
+        if proc.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"ffmpeg error: {proc.stderr}")
+
+        async with aiofiles.open(output_path, "rb") as f:
+            video_bytes = await f.read()
+
+        filename = f"guionviral_video_{int(time.time())}.mp4"
+        media = await _store_media(video_bytes, filename, "video/mp4")
+        return media
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
