@@ -81,7 +81,7 @@ jobs:
 
       - name: Start EAS cloud build
         env:
-          EXPO_TOKEN: ${{ secrets.LLAVE }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           cd frontend
           npx --yes eas-cli build --platform android --profile preview --non-interactive
