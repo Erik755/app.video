@@ -1,0 +1,90 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: "frontend/package-lock.json"
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+      
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: "35"
+          ndk-version: "26.1.10909125"
+          build-tools-version: "35.0.0"
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Prebuild Android
+        run: |
+          cd frontend
+          npx expo prebuild --platform android --clean
+      
+      - name: Build APK
+        run: |
+          cd frontend/android
+          chmod +x gradlew
+          ./gradlew assembleRelease --build-cache
+      
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: guionviral-apk
+          path: frontend/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: warn
+      
+      - name: Create Release (if tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: frontend/android/app/build/outputs/apk/release/app-release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  eas-build:
+    # This job runs only when a repository secret named `api` exists and is non-empty.
+    if: ${{ secrets.expo != '' }}
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      EXPO_TOKEN: ${{ secrets.expo }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install EAS CLI
+        run: |
+          npm install -g eas-cli
+
+      - name: Start EAS cloud build (uses EXPO_TOKEN from secret `expo`)
+        run: |
+          cd frontend
+          npx --yes eas-cli build --platform android --profile preview --non-interactive
