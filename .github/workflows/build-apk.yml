@@ -66,11 +66,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   eas-build:
-    # Runs immediately and independently when the `expo` secret exists.
-    if: ${{ secrets.expo != '' }}
     runs-on: ubuntu-latest
-    env:
-      EXPO_TOKEN: ${{ secrets.expo }}
     steps:
       - uses: actions/checkout@v4
 
@@ -84,6 +80,8 @@ jobs:
           npm install -g eas-cli
 
       - name: Start EAS cloud build
+        env:
+          EXPO_TOKEN: ${{ secrets.expo }}
         run: |
           cd frontend
           npx --yes eas-cli build --platform android --profile preview --non-interactive
