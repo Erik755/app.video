@@ -38,51 +38,7 @@ from emergentintegrations.llm.chat import (
     FileContentWithMimeType,
 )
 from emergentintegrations.llm.openai.text_to_speech import OpenAITextToSpeech
-@app.post("/api/merge-video-audio")
-async def merge_video_audio(
-    video: UploadFile = File(...),
-    audio: UploadFile = File(...),
-):
-    work_dir = tempfile.mkdtemp()
-    try:
-        ext = os.path.splitext(video.filename or ".mp4")[1] or ".mp4"
-        video_path = os.path.join(work_dir, f"input_video{ext}")
-        audio_path = os.path.join(work_dir, "input_audio.mp3")
-        output_path = os.path.join(work_dir, "output.mp4")
 
-        async with aiofiles.open(video_path, "wb") as f:
-            while chunk := await video.read(1024 * 1024):
-                await f.write(chunk)
-
-        async with aiofiles.open(audio_path, "wb") as f:
-            while chunk := await audio.read(1024 * 1024):
-                await f.write(chunk)
-import aiofiles, subprocess, shutil, tempfile, time, os, asyncio
-        cmd = [
-            "ffmpeg", "-y",
-            "-i", video_path,
-            "-i", audio_path,
-            "-c:v", "copy",
-            "-c:a", "aac",
-            "-map", "0:v:0",
-            "-map", "1:a:0",
-            "-shortest",
-            output_path,
-        ]
-        proc = await asyncio.to_thread(
-            subprocess.run, cmd, capture_output=True, text=True
-        )
-        if proc.returncode != 0:
-            raise HTTPException(status_code=500, detail=f"ffmpeg: {proc.stderr}")
-
-        async with aiofiles.open(output_path, "rb") as f:
-            video_bytes = await f.read()
-
-        filename = f"guionviral_video_{int(time.time())}.mp4"
-        media = await _store_media(video_bytes, filename, "video/mp4")
-        return media
-    finally:
-        shutil.rmtree(work_dir, ignore_errors=True)
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
 
@@ -873,3 +829,48 @@ async def merge_video_audio(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+@app.post("/api/merge-video-audio")
+async def merge_video_audio(
+    video: UploadFile = File(...),
+    audio: UploadFile = File(...),
+):
+    work_dir = tempfile.mkdtemp()
+    try:
+        ext = os.path.splitext(video.filename or ".mp4")[1] or ".mp4"
+        video_path = os.path.join(work_dir, f"input_video{ext}")
+        audio_path = os.path.join(work_dir, "input_audio.mp3")
+        output_path = os.path.join(work_dir, "output.mp4")
+
+        async with aiofiles.open(video_path, "wb") as f:
+            while chunk := await video.read(1024 * 1024):
+                await f.write(chunk)
+
+        async with aiofiles.open(audio_path, "wb") as f:
+            while chunk := await audio.read(1024 * 1024):
+                await f.write(chunk)
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path,
+            "-i", audio_path,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            output_path,
+        ]
+        proc = await asyncio.to_thread(
+            subprocess.run, cmd, capture_output=True, text=True
+        )
+        if proc.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"ffmpeg: {proc.stderr}")
+
+        async with aiofiles.open(output_path, "rb") as f:
+            video_bytes = await f.read()
+
+        filename = f"guionviral_video_{int(time.time())}.mp4"
+        media = await _store_media(video_bytes, filename, "video/mp4")
+        return media
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
